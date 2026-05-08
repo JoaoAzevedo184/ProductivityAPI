@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: productivity-api
+  output:
+    ansi:
+      enabled: ALWAYS
