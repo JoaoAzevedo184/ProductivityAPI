@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:taskdb-dev
+    username: sa
+    password: sa
+
+  h2:
+    console:
+      enabled: true
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
