@@ -37,7 +37,7 @@ public class Task {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "complete_at")
+    @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
     @PrePersist
