@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: productivity-api
+  profiles:
+    active: dev   # default, sobrescrito por SPRING_PROFILES_ACTIVE em prod
+
+  output:
+    ansi:
+      enabled: ALWAYS
+
+logging:
+  level:
+    root: INFO
+    com.github.joaovictor: DEBUG
