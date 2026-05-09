@@ -7,10 +7,18 @@ import com.github.joaovictor.productivity_api.domain.dto.request.UpdateTaskReque
 import com.github.joaovictor.productivity_api.domain.dto.response.TaskResponse;
 import com.github.joaovictor.productivity_api.domain.enums.Priority;
 import com.github.joaovictor.productivity_api.domain.enums.TaskStatus;
+import com.github.joaovictor.productivity_api.exception.ResourceNotFoundException;
 import com.github.joaovictor.productivity_api.repository.TaskRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
+@Service
+@Transactional(readOnly = true)
 public class TaskService {
     private final TaskRepository taskRepository;
 
@@ -19,6 +27,7 @@ public class TaskService {
     }
 
     // criar tarefa
+    @Transactional
     public TaskResponse create(CreateTaskRequest request) {
         Task task = TaskMapper.toEntity(request);
         Task savedTask = taskRepository.save(task);
@@ -26,19 +35,32 @@ public class TaskService {
     }
 
     // atualizar tarefa
-    public TaskResponse update(Long id, UpdateTaskRequest request){
+    @Transactional
+    public TaskResponse update(Long id, UpdateTaskRequest request) {
         Task task = taskRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada com id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Tarefa não encontrada com id: " + id));
+
+        TaskStatus statusAnterior = task.getStatus();
         TaskMapper.updateEntity(task, request);
+
+        // Regra de negócio: gerenciar completedAt conforme transição de status
+        if (request.status() != null && request.status() != statusAnterior) {
+            if (request.status() == TaskStatus.COMPLETED) {
+                task.setCompletedAt(LocalDateTime.now());
+            } else {
+                task.setCompletedAt(null); // reabriu a tarefa → limpa
+            }
+        }
+
         Task updatedTask = taskRepository.save(task);
         return TaskMapper.toResponse(updatedTask);
-
     }
 
     // excluir tarefa
+    @Transactional
     public void delete(Long id) {
         if (!taskRepository.existsById(id)) {
-            throw new RuntimeException("Tarefa não encontrada com id:" + id);
+            throw new ResourceNotFoundException("Tarefa não encontrada com id:" + id);
         }
         taskRepository.deleteById(id);
     }
@@ -46,7 +68,7 @@ public class TaskService {
     // obter tarefa por ID
     public TaskResponse findById(Long id){
         Task task = taskRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Tarefa não encontrada com id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Tarefa não encontrada com id: " + id));
         return TaskMapper.toResponse(task);
     }
 
@@ -58,27 +80,28 @@ public class TaskService {
                 .toList();
     }
 
-    // listar por status
-    public List<TaskResponse> findByStatus(TaskStatus status) {
-        return taskRepository.findByStatus(status)
-                .stream()
-                .map(TaskMapper::toResponse)
-                .toList();
+    // listar tarefas com paginação
+    public Page<TaskResponse> findAll(Pageable pageable) {
+        return taskRepository.findAll(pageable)
+                .map(TaskMapper::toResponse);
     }
 
-    // listar por prioridade
-    public List<TaskResponse> findByPriority(Priority priority) {
-        return taskRepository.findByPriority(priority)
-                .stream()
-                .map(TaskMapper::toResponse)
-                .toList();
+    // listar tarefas por status com paginação
+    public Page<TaskResponse> findByStatus(TaskStatus status, Pageable pageable) {
+        return taskRepository.findByStatus(status, pageable)
+                .map(TaskMapper::toResponse);
     }
 
-    // buscar por título
-    public List<TaskResponse> searchByTitle(String title) {
-        return taskRepository.findByTitleContainingIgnoreCase(title)
-                .stream()
-                .map(TaskMapper::toResponse)
-                .toList();
+    // listar tarefas por prioridade com paginação
+    public Page<TaskResponse> findByPriority(Priority priority, Pageable pageable) {
+        return taskRepository.findByPriority(priority, pageable)
+                .map(TaskMapper::toResponse);
     }
+
+    // listar tarefas por título com paginação
+    public Page<TaskResponse> searchByTitle(String title, Pageable pageable) {
+        return taskRepository.findByTitleContainingIgnoreCase(title, pageable)
+                .map(TaskMapper::toResponse);
+    }
+
 }

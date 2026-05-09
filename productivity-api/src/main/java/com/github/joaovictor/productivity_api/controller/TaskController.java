@@ -8,6 +8,10 @@ import com.github.joaovictor.productivity_api.domain.enums.Priority;
 import com.github.joaovictor.productivity_api.domain.enums.TaskStatus;
 import com.github.joaovictor.productivity_api.service.TaskService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,10 +28,13 @@ public class TaskController {
     }
 
     // Injeção direta do repositório para métodos que não utilizam o service, como GETs simples
-    // GET 2.0: /tasks
+    // GET 3.0: /tasks
+    // Suporta paginação e ordenação, com valores padrão para evitar sobrecarga
     @GetMapping
-    public ResponseEntity<List<TaskResponse>> findAll() {
-        return ResponseEntity.ok(taskService.findAll());
+    public ResponseEntity<Page<TaskResponse>> findAll(
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(taskService.findAll(pageable));
     }
 
     // GET 2.0: /tasks/{id}
@@ -47,7 +54,7 @@ public class TaskController {
     // PUT 2.0: /tasks/{id}
     @PutMapping("/{id}")
     public ResponseEntity<TaskResponse> update(@PathVariable Long id,
-                                               @RequestBody UpdateTaskRequest updated){
+                                               @Valid @RequestBody UpdateTaskRequest updated){
         return ResponseEntity.ok(taskService.update(id, updated));
     }
 
@@ -58,88 +65,31 @@ public class TaskController {
         return ResponseEntity.noContent().build();
     }
 
-    // GET  2.0: /tasks/status/{status}
+    // GET  3.0: /tasks/status/{status}
+    // Suporta paginação e ordenação, com valores padrão para evitar sobrecarga
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<TaskResponse>> findByStatus(@PathVariable String status) {
-        return ResponseEntity.ok(
-                taskService.findByStatus(TaskStatus.valueOf(status.toUpperCase()))
-        );
+    public ResponseEntity<Page<TaskResponse>> findByStatus(
+            @PathVariable TaskStatus status,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(taskService.findByStatus(status, pageable));
     }
 
-    // GET 2.0: /tasks/priority/{priority}
+    // GET 3.0: /tasks/priority/{priority}
     @GetMapping("/priority/{priority}")
-    public ResponseEntity<List<TaskResponse>> findByPriority(@PathVariable Priority priority) {
-        return ResponseEntity.ok(taskService.findByPriority(priority));
+    public ResponseEntity<Page<TaskResponse>> findByPriority(
+            @PathVariable Priority priority,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(taskService.findByPriority(priority, pageable));
     }
 
-    // GET 2.0: /tasks/search?title=algumTitulo
+    // GET 3.0: /tasks/search?title=algumTitulo
     @GetMapping("/search")
-    public ResponseEntity<List<TaskResponse>> search(@RequestParam String title) {
-        return ResponseEntity.ok(taskService.searchByTitle(title));
+    public ResponseEntity<Page<TaskResponse>> search(
+            @RequestParam String title,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(taskService.searchByTitle(title, pageable));
     }
-
-    /* Metodo antigo, sem service e DTOs
-    * // GET: /tasks
-    @GetMapping
-    public ResponseEntity<List<Task>> getAllTasks() {
-        return ResponseEntity.ok(taskRepository.findAll());
-    }
-
-    // GET: /tasks/{id}
-    @GetMapping("/{id}")
-    public ResponseEntity<Task> findById(@PathVariable Long id){
-        return taskRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    // POST: /tasks
-    @PostMapping
-    public ResponseEntity<Task> createTask(@RequestBody Task task){
-        Task savedTask = taskRepository.save(task);
-        return ResponseEntity.ok(savedTask);
-    }
-
-    // PUT: /tasks/{id}
-    @PutMapping("/{id}")
-    public ResponseEntity<Task> updateTask(@PathVariable Long id, @RequestBody Task updated){
-        return taskRepository.findById(id)
-                .map(task -> {
-                    task.setTitle(updated.getTitle());
-                    task.setDescription(updated.getDescription());
-                    task.setStatus(updated.getStatus());
-                    task.setPriority(updated.getPriority());
-                    return ResponseEntity.ok(taskRepository.save(task));
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    // DELETE: /tasks/{id}
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        if (!taskRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
-
-        taskRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
-    }
-
-    // GET: /tasks/status/{status}
-    @GetMapping("/status/{status}")
-    public ResponseEntity<List<Task>> findByStatus(@PathVariable TaskStatus status) {
-        return ResponseEntity.ok(taskRepository.findByStatus(status));
-    }
-
-    // GET: /tasks/priority/{priority}
-    @GetMapping("/priority/{priority}")
-    public ResponseEntity<List<Task>> findByPriority(@PathVariable Priority priority) {
-        return ResponseEntity.ok(taskRepository.findByPriority(priority));
-    }
-
-    // GET: /tasks/search?title=algumTitulo
-    @GetMapping("/search")
-    public ResponseEntity<List<Task>> search(@RequestParam String title) {
-        return ResponseEntity.ok(taskRepository.findByTitleContainingIgnoreCase(title));
-    }*/
 }

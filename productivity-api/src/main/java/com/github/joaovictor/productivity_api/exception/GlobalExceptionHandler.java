@@ -7,8 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -33,9 +35,9 @@ public class GlobalExceptionHandler {
     // 400 - validação de DTO
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(
-            MethodArgumentNotValidException  ex,
+            MethodArgumentNotValidException ex,
             HttpServletRequest request
-    ){
+    ) {
         String message = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
@@ -45,7 +47,32 @@ public class GlobalExceptionHandler {
         ApiError error = new ApiError(
                 HttpStatus.BAD_REQUEST.value(),
                 "VALIDATION_ERROR",
-                ex.getMessage(),
+                message,                       // ✅ era ex.getMessage()
+                request.getRequestURI(),
+                LocalDateTime.now()
+        );
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    // 400 - parâmetro com tipo inválido (ex: enum com valor que não existe)
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request
+    ) {
+        String message = String.format(
+                "Parâmetro '%s' com valor inválido: '%s'. Valores aceitos: %s",
+                ex.getName(),
+                ex.getValue(),
+                ex.getRequiredType() != null && ex.getRequiredType().isEnum()
+                        ? Arrays.toString(ex.getRequiredType().getEnumConstants())
+                        : ex.getRequiredType()
+        );
+
+        ApiError error = new ApiError(
+                HttpStatus.BAD_REQUEST.value(),
+                "INVALID_PARAMETER",
+                message,
                 request.getRequestURI(),
                 LocalDateTime.now()
         );

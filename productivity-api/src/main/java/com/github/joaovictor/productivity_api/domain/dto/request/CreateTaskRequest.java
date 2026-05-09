@@ -3,6 +3,7 @@ package com.github.joaovictor.productivity_api.domain.dto.request;
 import com.github.joaovictor.productivity_api.domain.enums.Priority;
 import com.github.joaovictor.productivity_api.domain.enums.TaskStatus;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 
@@ -17,9 +18,9 @@ public record CreateTaskRequest(
         @Size(max = 500)
         String description,
 
-        @NotBlank(message = "O status é obrigatória")
+        @NotNull(message = "O status é obrigatório")
         TaskStatus status,
 
-        @NotBlank(message = "A prioridade é obrigatória")
+        @NotNull(message = "A prioridade é obrigatória")
         Priority priority
 ) {}
