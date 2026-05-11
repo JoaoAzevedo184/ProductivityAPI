@@ -8,13 +8,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-@RestControllerAdvice
+@RestControllerAdvice(basePackages = "com.github.joaovictor.productivity_api")
 public class GlobalExceptionHandler {
+
+    // Logger para registrar erros (opcional, mas recomendado)
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     // 404 - Recurso não encontrado
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -97,15 +102,18 @@ public class GlobalExceptionHandler {
     }
 
     // 500 - Erro genérico
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(
             Exception ex,
             HttpServletRequest request
-    ){
+    ) {
+        log.error("Erro inesperado em {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+
         ApiError error = new ApiError(
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "INTERNAL_SERVER_ERROR",
-                "Unexpected error occurred",
+                "Ocorreu um erro inesperado. Por favor, tente novamente mais tarde.",
                 request.getRequestURI(),
                 LocalDateTime.now()
         );
