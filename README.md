@@ -131,7 +131,7 @@ Aplicação disponível em **http://localhost:8080**.
 
 ## 🛣️ Endpoints
 
-Resumo. A referência completa com exemplos de payload e respostas está em [`docs/api.md`](docs/api.md).
+Resumo. A referência completa com exemplos de payload e respostas está em [`docs/api.md`](productivity-api/docs/api.md).
 
 | Método | Path | Descrição |
 |---|---|---|
@@ -222,19 +222,19 @@ Estrutura de testes prevista:
 
 Documentos detalhados em [`docs/`](docs/):
 
-- **[api.md](docs/api.md)** — referência completa dos endpoints com payloads e respostas
-- **[architecture.md](docs/architecture.md)** — arquitetura em camadas, fluxo de uma requisição, padrões adotados
-- **[decisions.md](docs/decisions.md)** — ADRs (Architecture Decision Records) registrando o "porquê" de cada escolha técnica
-- **[devops.md](docs/devops.md)** — visão consolidada das práticas DevOps aplicadas ao projeto
-- **[roadmap.md](docs/roadmap.md)** — evolução planejada (migrations, observabilidade, autenticação, etc.)
-- **[setup.md](docs/setup.md)** — guia passo a passo para configurar o ambiente local
+- **[api.md](productivity-api/docs/api.md)** — referência completa dos endpoints com payloads e respostas
+- **[architecture.md](productivity-api/docs/architecture.md)** — arquitetura em camadas, fluxo de uma requisição, padrões adotados
+- **[decisions.md](productivity-api/docs/decisions.md)** — ADRs (Architecture Decision Records) registrando o "porquê" de cada escolha técnica
+- **[devops.md](productivity-api/docs/devops.md)** — visão consolidada das práticas DevOps aplicadas ao projeto
+- **[roadmap.md](productivity-api/docs/roadmap.md)** — evolução planejada (migrations, observabilidade, autenticação, etc.)
+- **[setup.md](productivity-api/docs/setup.md)** — guia passo a passo para configurar o ambiente local
 - **[challengs/](docs/challengs/)** — implementação dos cinco desafios DevOps da disciplina
 
 ---
 
 ## 🗺️ Roadmap
 
-Visão resumida. Detalhes em [`docs/roadmap.md`](docs/roadmap.md).
+Visão resumida. Detalhes em [`docs/roadmap.md`](productivity-api/docs/roadmap.md).
 
 - [x] CRUD completo de tarefas
 - [x] Paginação, filtros e busca
