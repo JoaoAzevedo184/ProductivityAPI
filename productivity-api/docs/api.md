@@ -1,6 +1,6 @@
 # 📡 API Reference — Productivity API
 
-Referência completa dos endpoints da Productivity API. Para uma visão geral e exemplos rápidos, veja o [README](../README.md).
+Referência completa dos endpoints da Productivity API. Para uma visão geral e exemplos rápidos, veja o [README](../../README.md).
 
 > **Base URL local:** `http://localhost:8080`
 > **OpenAPI spec:** `GET /v3/api-docs`
