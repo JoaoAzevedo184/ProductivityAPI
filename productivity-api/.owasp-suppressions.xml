@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!--
+      Esse arquivo é onde você suprime falsos positivos do OWASP.
+      Quando o scan reportar uma CVE que você analisou e decidiu ignorar,
+      adiciona aqui com justificativa.
+
+      Exemplo:
+      <suppress>
+          <notes>CVE não se aplica: não usamos o componente vulnerável X</notes>
+          <cve>CVE-2024-XXXXX</cve>
+      </suppress>
+    -->
+</suppressions>
