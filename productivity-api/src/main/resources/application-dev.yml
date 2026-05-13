@@ -17,14 +17,15 @@ spring:
     properties:
       hibernate:
         format_sql: true
-    sql:
-      init:
-        mode: always   # opcional, garante execução em qualquer banco (não só embarcados)
-    management:
-      endpoints:
-        web:
-          exposure:
-            include: health, info, metrics
-      endpoint:
-        health:
-          show-details: when-authorized
+  sql:
+    init:
+      mode: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  endpoint:
+    health:
+      show-details: when-authorized
