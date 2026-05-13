@@ -1,263 +1,264 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.14</version>
-		<relativePath/> <!-- lookup parent from repository -->
-	</parent>
-	<groupId>com.github.joaovictor</groupId>
-	<artifactId>productivity-api</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
-	<name>productivity-api</name>
-	<description>API REST para gerenciamento de tarefas e produtividade pessoal</description>
-	<url>https://github.com/JoaoAzevedo184/productivity-api</url>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.14</version>
+    <relativePath></relativePath>
+    <!-- lookup parent from repository -->
+  </parent>
+  <groupId>com.github.joaovictor</groupId>
+  <artifactId>productivity-api</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <name>productivity-api</name>
+  <description>API REST para gerenciamento de tarefas e produtividade pessoal</description>
+  <url>https://github.com/JoaoAzevedo184/productivity-api</url>
 
-	<licenses>
-		<license>
-			<name>MIT License</name>
-			<url>https://opensource.org/licenses/MIT</url>
-		</license>
-	</licenses>
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+    </license>
+  </licenses>
 
-	<developers>
-		<developer>
-			<id>joaovictor</id>
-			<name>João Victor Azevedo</name>
-			<url>https://github.com/JoaoAzevedo184</url>
-		</developer>
-	</developers>
+  <developers>
+    <developer>
+      <id>joaovictor</id>
+      <name>João Victor Azevedo</name>
+      <url>https://github.com/JoaoAzevedo184</url>
+    </developer>
+  </developers>
 
-	<scm>
-		<connection>scm:git:git://github.com/JoaoAzevedo184/productivity-api.git</connection>
-		<developerConnection>scm:git:ssh://github.com:JoaoAzevedo184/productivity-api.git</developerConnection>
-		<url>https://github.com/JoaoAzevedo184/productivity-api</url>
-	</scm>
-	<properties>
-		<java.version>21</java.version>
-	</properties>
-	<dependencies>
-		<!-- Spring JPA -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
-		</dependency>
-		<!-- Spring Validation -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-validation</artifactId>
-		</dependency>
-		<!-- Spring WEB -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
-		</dependency>
-		<!-- Spring Devtools -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
-			<scope>runtime</scope>
-			<optional>true</optional>
-		</dependency>
-		<!-- H2 -->
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
-		</dependency>
-		<!-- Lombok -->
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-			<optional>true</optional>
-		</dependency>
-		<!-- Spring Start -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<!-- Swagger -->
-		<dependency>
-			<groupId>org.springdoc</groupId>
-			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-			<version>2.8.16</version>
-		</dependency>
-		<!-- Actuator: endpoints de health, metrics, info -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-actuator</artifactId>
-		</dependency>
-	</dependencies>
+  <scm>
+    <connection>scm:git:git://github.com/JoaoAzevedo184/productivity-api.git</connection>
+    <developerConnection>scm:git:ssh://github.com:JoaoAzevedo184/productivity-api.git</developerConnection>
+    <url>https://github.com/JoaoAzevedo184/productivity-api</url>
+  </scm>
+  <properties>
+    <java.version>21</java.version>
+  </properties>
+  <dependencies>
+    <!-- Spring JPA -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <!-- Spring Validation -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <!-- Spring WEB -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <!-- Spring Devtools -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-devtools</artifactId>
+      <scope>runtime</scope>
+      <optional>true</optional>
+    </dependency>
+    <!-- H2 -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <!-- Lombok -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <!-- Spring Start -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Swagger -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>2.8.16</version>
+    </dependency>
+    <!-- Actuator: endpoints de health, metrics, info -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+  </dependencies>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<excludes>
-						<exclude>
-							<groupId>org.projectlombok</groupId>
-							<artifactId>lombok</artifactId>
-						</exclude>
-					</excludes>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>default-compile</id>
-						<phase>compile</phase>
-						<goals>
-							<goal>compile</goal>
-						</goals>
-						<configuration>
-							<annotationProcessorPaths>
-								<path>
-									<groupId>org.projectlombok</groupId>
-									<artifactId>lombok</artifactId>
-								</path>
-							</annotationProcessorPaths>
-						</configuration>
-					</execution>
-					<execution>
-						<id>default-testCompile</id>
-						<phase>test-compile</phase>
-						<goals>
-							<goal>testCompile</goal>
-						</goals>
-						<configuration>
-							<annotationProcessorPaths>
-								<path>
-									<groupId>org.projectlombok</groupId>
-									<artifactId>lombok</artifactId>
-								</path>
-							</annotationProcessorPaths>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<!-- JaCoCo: cobertura de testes -->
-			<plugin>
-				<groupId>org.jacoco</groupId>
-				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.8.12</version>
-				<executions>
-					<!-- Habilita o agente que mede cobertura -->
-					<execution>
-						<id>prepare-agent</id>
-						<goals>
-							<goal>prepare-agent</goal>
-						</goals>
-					</execution>
-					<!-- Gera relatório HTML + XML após os testes -->
-					<execution>
-						<id>report</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>report</goal>
-						</goals>
-					</execution>
-					<!-- Gate: falha o build se cobertura cair abaixo de 60% (depois subimos pra 80%) -->
-					<execution>
-						<id>check</id>
-						<phase>verify</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-						<configuration>
-							<rules>
-								<rule>
-									<element>BUNDLE</element>
-									<limits>
-										<limit>
-											<counter>LINE</counter>
-											<value>COVEREDRATIO</value>
-											<minimum>0.60</minimum>
-										</limit>
-									</limits>
-								</rule>
-							</rules>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<!-- Spotless: formatação automática -->
-			<plugin>
-				<groupId>com.diffplug.spotless</groupId>
-				<artifactId>spotless-maven-plugin</artifactId>
-				<version>2.43.0</version>
-				<configuration>
-					<java>
-						<googleJavaFormat>
-							<version>1.22.0</version>
-							<style>GOOGLE</style>
-						</googleJavaFormat>
-						<removeUnusedImports/>
-						<trimTrailingWhitespace/>
-						<endWithNewline/>
-					</java>
-					<pom>
-						<sortPom/>
-					</pom>
-				</configuration>
-				<executions>
-					<execution>
-						<id>spotless-check</id>
-						<phase>validate</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+            </exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>default-compile</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <phase>compile</phase>
+            <configuration>
+              <annotationProcessorPaths>
+                <path>
+                  <groupId>org.projectlombok</groupId>
+                  <artifactId>lombok</artifactId>
+                </path>
+              </annotationProcessorPaths>
+            </configuration>
+          </execution>
+          <execution>
+            <id>default-testCompile</id>
+            <goals>
+              <goal>testCompile</goal>
+            </goals>
+            <phase>test-compile</phase>
+            <configuration>
+              <annotationProcessorPaths>
+                <path>
+                  <groupId>org.projectlombok</groupId>
+                  <artifactId>lombok</artifactId>
+                </path>
+              </annotationProcessorPaths>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- JaCoCo: cobertura de testes -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.12</version>
+        <executions>
+          <!-- Habilita o agente que mede cobertura -->
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <!-- Gera relatório HTML + XML após os testes -->
+          <execution>
+            <id>report</id>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+          <!-- Gate: falha o build se cobertura cair abaixo de 60% (depois subimos pra 80%) -->
+          <execution>
+            <id>check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.60</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Spotless: formatação automática -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>2.43.0</version>
+        <configuration>
+          <java>
+            <googleJavaFormat>
+              <version>1.22.0</version>
+              <style>GOOGLE</style>
+            </googleJavaFormat>
+            <removeUnusedImports></removeUnusedImports>
+            <trimTrailingWhitespace></trimTrailingWhitespace>
+            <endWithNewline></endWithNewline>
+          </java>
+          <pom>
+            <sortPom></sortPom>
+          </pom>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotless-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>validate</phase>
+          </execution>
+        </executions>
+      </plugin>
 
-			<!-- SpotBugs: análise estática de bugs -->
-			<plugin>
-				<groupId>com.github.spotbugs</groupId>
-				<artifactId>spotbugs-maven-plugin</artifactId>
-				<version>4.8.6.4</version>
-				<configuration>
-					<effort>Max</effort>
-					<threshold>Medium</threshold>
-					<failOnError>false</failOnError>
-					<xmlOutput>true</xmlOutput>
-					<xmlOutputDirectory>target/spotbugs</xmlOutputDirectory>
-				</configuration>
-				<executions>
-					<execution>
-						<phase>verify</phase>
-						<goals>
-							<goal>check</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
+      <!-- SpotBugs: análise estática de bugs -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>4.8.6.4</version>
+        <configuration>
+          <effort>Max</effort>
+          <threshold>Medium</threshold>
+          <failOnError>false</failOnError>
+          <xmlOutput>true</xmlOutput>
+          <xmlOutputDirectory>target/spotbugs</xmlOutputDirectory>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+      </plugin>
 
-			<!-- OWASP Dependency Check: vulnerabilidades nas dependências -->
-			<plugin>
-				<groupId>org.owasp</groupId>
-				<artifactId>dependency-check-maven</artifactId>
-				<version>10.0.4</version>
-				<configuration>
-					<failBuildOnCVSS>11</failBuildOnCVSS>  <!-- 11 = nunca falha (CVSS vai de 0-10). Quando confiante, baixar para 7 -->
-					<formats>
-						<format>HTML</format>
-						<format>JSON</format>
-					</formats>
-					<suppressionFiles>
-						<suppressionFile>.owasp-suppressions.xml</suppressionFile>
-					</suppressionFiles>
-					<nvdValidForHours>24</nvdValidForHours>
-				</configuration>
-				<!-- Não roda em verify por padrão (é lento). Roda só quando explicitamente invocado. -->
-			</plugin>
-		</plugins>
-	</build>
+      <!-- OWASP Dependency Check: vulnerabilidades nas dependências -->
+      <plugin>
+        <groupId>org.owasp</groupId>
+        <artifactId>dependency-check-maven</artifactId>
+        <version>10.0.4</version>
+        <configuration>
+          <failBuildOnCVSS>11</failBuildOnCVSS>
+          <!-- 11 = nunca falha (CVSS vai de 0-10). Quando confiante, baixar para 7 -->
+          <formats>
+            <format>HTML</format>
+            <format>JSON</format>
+          </formats>
+          <suppressionFiles>
+            <suppressionFile>.owasp-suppressions.xml</suppressionFile>
+          </suppressionFiles>
+          <nvdValidForHours>24</nvdValidForHours>
+        </configuration>
+        <!-- Não roda em verify por padrão (é lento). Roda só quando explicitamente invocado. -->
+      </plugin>
+    </plugins>
+  </build>
 
 </project>
