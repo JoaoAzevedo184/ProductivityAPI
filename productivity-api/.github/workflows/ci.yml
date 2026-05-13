@@ -1,48 +1,59 @@
 name: CI
 
+# Dispara o pipeline
 on:
   push:
-    branches: [main]
+    branches: [ main ]         # roda quando faz push na main
   pull_request:
-    branches: [main]
-  workflow_dispatch:
+    branches: [ main ]         # roda em PRs para main
+  workflow_dispatch:           # permite rodar manualmente
 
+# Evita múltiplos pipelines rodando ao mesmo tempo na mesma branch
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Permissões mínimas (boa prática de segurança)
+permissions:
+  contents: read
+
 jobs:
+
   # ============================================================
-  # Job 1: Verificações rápidas (formatação)
-  # Roda primeiro — falha em segundos se código mal formatado
+  # Job 1: Lint (fail fast)
   # ============================================================
   lint:
     name: Lint (Spotless)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4   # baixa o código
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'maven'
+          distribution: temurin
+          java-version: 21
+          cache: maven              # cache automático do Maven (~/.m2)
 
       - name: Make mvnw executable
-        run: chmod +x ./mvnw
+        run: chmod +x ./mvnw        # garante permissão de execução
 
-      - name: Spotless check
-        run: ./mvnw -B spotless:check
+      - name: Run Spotless
+        run: ./mvnw -B spotless:check  # valida formatação (falha rápido)
+
 
   # ============================================================
-  # Job 2: Build + testes + cobertura + SpotBugs
+  # Job 2: Build + Test + Qualidade
   # ============================================================
   build-and-test:
     name: Build, Test & Coverage
     runs-on: ubuntu-latest
-    needs: lint  # só roda se o lint passar
+    needs: lint                    # só roda se lint passar
+    timeout-minutes: 20
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,21 +61,27 @@ jobs:
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'maven'
+          distribution: temurin
+          java-version: 21
+          cache: maven
 
       - name: Make mvnw executable
         run: chmod +x ./mvnw
 
-      - name: Build + test + SpotBugs + JaCoCo gate
+      - name: Build + Test + Analysis
         run: ./mvnw -B verify
+        # roda:
+        # - build
+        # - testes
+        # - JaCoCo (cobertura)
+        # - SpotBugs (análise estática)
 
-      - name: Upload coverage report
+      # Upload de artefatos (mesmo se falhar)
+      - name: Upload JaCoCo report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: jacoco-coverage-report
+          name: jacoco-report
           path: target/site/jacoco/
           retention-days: 7
 
@@ -76,7 +93,7 @@ jobs:
           path: target/spotbugs/
           retention-days: 7
 
-      - name: Upload test results
+      - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -84,25 +101,28 @@ jobs:
           path: target/surefire-reports/
           retention-days: 7
 
-      - name: Job summary
+      # Resumo visível direto no GitHub
+      - name: Job Summary
         if: always()
         run: |
           echo "## 📊 Resultados do CI" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Artifact | Descrição |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| jacoco-coverage-report | Cobertura de testes (HTML) |" >> $GITHUB_STEP_SUMMARY
-          echo "| spotbugs-report | Bugs estáticos detectados |" >> $GITHUB_STEP_SUMMARY
-          echo "| surefire-reports | Resultado dos testes unitários |" >> $GITHUB_STEP_SUMMARY
+          echo "| jacoco-report | Cobertura de testes |" >> $GITHUB_STEP_SUMMARY
+          echo "| spotbugs-report | Bugs estáticos |" >> $GITHUB_STEP_SUMMARY
+          echo "| surefire-reports | Testes unitários |" >> $GITHUB_STEP_SUMMARY
+
 
   # ============================================================
-  # Job 3: Scan de vulnerabilidades (OWASP)
-  # Roda em paralelo com build-and-test pra não atrasar feedback
+  # Job 3: Segurança (OWASP + NVD)
   # ============================================================
   security-scan:
-    name: Security (OWASP Dependency Check)
+    name: Security Scan (OWASP)
     runs-on: ubuntu-latest
-    needs: lint
+    needs: lint                   # roda em paralelo com build-and-test
+    timeout-minutes: 30
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,28 +130,33 @@ jobs:
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'maven'
+          distribution: temurin
+          java-version: 21
+          cache: maven
 
-      # Cache do banco da NVD — sem isso, baixa ~500MB toda vez
+      # Cache do banco de vulnerabilidades (evita download pesado ~500MB)
       - name: Cache NVD database
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository/org/owasp/dependency-check-data
-          key: nvd-${{ runner.os }}-v1
+          key: nvd-${{ runner.os }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            nvd-${{ runner.os }}-
 
       - name: Make mvnw executable
         run: chmod +x ./mvnw
 
-      - name: OWASP Dependency Check
-        run: ./mvnw -B org.owasp:dependency-check-maven:check
-        continue-on-error: true  # primeira rodada: não bloqueia, só relata
+      # Scan de vulnerabilidades usando NVD
+      - name: Run OWASP Dependency Check
+        run: ./mvnw -B org.owasp:dependency-check-maven:check -DnvdApiKey=${{ secrets.NVD_API_KEY }}
+        continue-on-error: true
+        # não quebra o build (modo observação)
+        # depois você pode mudar para false pra bloquear PR
 
       - name: Upload OWASP report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: owasp-dependency-check-report
+          name: owasp-report
           path: target/dependency-check-report.*
           retention-days: 7
