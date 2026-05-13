@@ -1,0 +1,49 @@
+# ============================================================
+# Reduz o contexto de build do Docker.
+# Tudo aqui é IGNORADO pelo `docker build`, mesmo que esteja no projeto.
+# Benefícios: build mais rápido + sem vazamento de arquivos sensíveis.
+# ============================================================
+
+# Build artifacts (já sobra do Maven local)
+target/
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Logs
+*.log
+logs/
+
+# Documentação não precisa ir pra imagem
+docs/
+*.md
+LICENSE
+
+# Postman
+*.postman_collection.json
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Configs do próprio Docker — não copia pra dentro do build
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Testes (já rodaram no CI antes do build da imagem)
+src/test/
+
+# OWASP suppressions (config do CI, não precisa em runtime)
+.owasp-suppressions.xml

@@ -416,7 +416,92 @@ productivity-api/
 5. Preparar slides (5 slides, foco em demo).
 
 ---
+# Atualizações do `challenge-02.md`
 
+Substitua a tabela de status no topo:
+
+```markdown
+| Campo | Valor |
+|---|---|
+| **Status** | 🟡 Dockerfile concluído · docker-compose pendente |
+| **Aplicação-base** | productivity-api |
+| **Ferramenta** | Docker + Docker Compose (Kubernetes vem no [Desafio 03](challenge-03.md)) |
+| **Modo** | Solo |
+```
+
+E adicione, antes da seção "Implementação", esta nova seção:
+
+```markdown
+## ✅ O que foi entregue até agora
+
+### Dockerfile multi-stage (`productivity-api/Dockerfile`)
+
+- **Stage 1 (builder)** — `eclipse-temurin:21-jdk-alpine`. Copia o `pom.xml` antes do código pra aproveitar o cache de dependências do Docker. Em rebuilds incrementais, se só o código mudou, o `dependency:go-offline` não roda de novo.
+- **Stage 2 (runtime)** — `eclipse-temurin:21-jre-alpine`. Só JRE (mais leve), sem JDK nem Maven, sem código-fonte. Tamanho final ≈ 250MB.
+- **Usuário não-root** (`appuser`) — mitigação de escalada de privilégios em caso de RCE.
+- **`SPRING_PROFILES_ACTIVE=dev` por padrão** — imagem sobe standalone (H2 in-memory). Sobrescrevível em runtime via `-e SPRING_PROFILES_ACTIVE=prod` quando integrar com Postgres.
+- **`JAVA_OPTS`** parametrizável — permite tunar heap (`-Xms256m -Xmx512m`) sem rebuild.
+- **HEALTHCHECK** com `wget --spider http://localhost:8080/actuator/health` — `start-period=60s` dá folga pra Spring Boot subir.
+
+### `.dockerignore`
+
+Reduz o contexto de build excluindo `target/`, `.git/`, `.idea/`, `src/test/`, docs e arquivos de IDE. Sem isso, o `docker build` envia ~100MB+ pro daemon mesmo que esses arquivos não sejam usados na imagem.
+
+### Decisões aplicadas
+
+| Decisão | Por quê |
+|---|---|
+| Multi-stage build | Imagem final não carrega Maven, JDK ou código-fonte |
+| Alpine como base | ~5MB de SO base; superfície de ataque menor |
+| `dependency:go-offline` antes de `COPY src` | Mudanças no código não invalidam o cache de dependências |
+| Usuário não-root | Princípio do menor privilégio |
+| Profile `dev` default | Imagem é testável standalone (`docker run -p 8080:8080 ...`) |
+| `wget` adicionado via `apk` | Alpine não vem com curl/wget; precisa explicitamente |
+| `start-period=60s` | Spring Boot pode demorar a subir em hardware modesto |
+
+---
+
+## 🧪 Testes locais (antes do compose)
+
+Roteiro pra validar o Dockerfile sozinho:
+
+```bash
+cd productivity-api
+
+# Build
+docker build -t productivity-api:local .
+
+# Ver tamanho
+docker images productivity-api
+# REPOSITORY         TAG     SIZE
+# productivity-api   local   ~250MB
+
+# Rodar
+docker run -d --name productivity-test -p 8080:8080 productivity-api:local
+
+# Aguardar startup (60-90s na primeira vez)
+docker logs -f productivity-test
+
+# Validar
+curl http://localhost:8080/actuator/health
+# {"status":"UP"}
+
+curl http://localhost:8080/tasks
+# {"content":[...],"totalElements":15, ...}   ← os 15 do data.sql
+
+# Healthcheck
+docker ps
+# STATUS                    PORTS
+# Up 2 minutes (healthy)    0.0.0.0:8080->8080/tcp
+
+# Confirmar usuário não-root
+docker exec productivity-test whoami
+# appuser
+
+# Cleanup
+docker stop productivity-test && docker rm productivity-test
+```
+```
 ## 📚 Referências
 
 - [Docker — Best practices for writing Dockerfiles](https://docs.docker.com/develop/develop-images/dockerfile_best-practices/)

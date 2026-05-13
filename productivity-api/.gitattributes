@@ -1,2 +1,23 @@
-/mvnw text eol=lf
-*.cmd text eol=crlf
+# Força LF (\n) para arquivos de código, mesmo em Windows.
+# Sem isso, o Git no Windows converte para CRLF (\r\n) no checkout,
+# e o Spotless quebra o build porque o Google Java Format espera LF.
+
+*.java   text eol=lf
+*.xml    text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+*.sql    text eol=lf
+*.sh     text eol=lf
+
+# Wrapper scripts
+mvnw     text eol=lf
+*.cmd    text eol=crlf
+*.bat    text eol=crlf
+
+# Binários: nunca converter
+*.jar    binary
+*.png    binary
+*.jpg    binary
+*.ico    binary
