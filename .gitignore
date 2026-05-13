@@ -9,6 +9,9 @@
 *.iws
 *.ipr
 
+#claude
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -16,6 +19,7 @@ Thumbs.db
 # Build outputs
 **/target/
 **/build/
+target/
 
 # Logs
 *.log
