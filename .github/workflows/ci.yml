@@ -3,9 +3,9 @@ name: CI
 # Dispara o pipeline
 on:
   push:
-    branches: [ main ]         # roda quando faz push na main
+    branches: [main]
   pull_request:
-    branches: [ main ]         # roda em PRs para main
+    branches: [main]
   workflow_dispatch:           # permite rodar manualmente
 
 # Evita múltiplos pipelines rodando ao mesmo tempo na mesma branch
@@ -21,6 +21,7 @@ jobs:
 
   # ============================================================
   # Job 1: Lint (fail fast)
+  # Roda primeiro — falha em segundos se código mal formatado
   # ============================================================
   lint:
     name: Lint (Spotless)
@@ -29,21 +30,21 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4   # baixa o código
+        uses: actions/checkout@v4
 
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
-          cache: maven              # cache automático do Maven (~/.m2)
+          cache: maven
 
       - name: Make mvnw executable
-        run: chmod +x ./mvnw        # garante permissão de execução
+        run: chmod +x ./productivity-api/mvnw
 
       - name: Run Spotless
-        run: ./mvnw -B spotless:check  # valida formatação (falha rápido)
-
+        working-directory: productivity-api
+        run: ./mvnw -B spotless:check
 
   # ============================================================
   # Job 2: Build + Test + Qualidade
@@ -66,23 +67,20 @@ jobs:
           cache: maven
 
       - name: Make mvnw executable
-        run: chmod +x ./mvnw
+        run: chmod +x ./productivity-api/mvnw
 
       - name: Build + Test + Analysis
+        working-directory: productivity-api
         run: ./mvnw -B verify
-        # roda:
-        # - build
-        # - testes
-        # - JaCoCo (cobertura)
-        # - SpotBugs (análise estática)
+        # roda compile + testes + JaCoCo (cobertura) + SpotBugs (análise estática)
 
-      # Upload de artefatos (mesmo se falhar)
+      # Upload de artefatos (mesmo se falhar — útil pra debugar falhas)
       - name: Upload JaCoCo report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
-          path: target/site/jacoco/
+          path: productivity-api/target/site/jacoco/
           retention-days: 7
 
       - name: Upload SpotBugs report
@@ -90,7 +88,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: spotbugs-report
-          path: target/spotbugs/
+          path: productivity-api/target/spotbugs/
           retention-days: 7
 
       - name: Upload Test Results
@@ -98,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: surefire-reports
-          path: target/surefire-reports/
+          path: productivity-api/target/surefire-reports/
           retention-days: 7
 
       # Resumo visível direto no GitHub
@@ -109,32 +107,34 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Artifact | Descrição |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| jacoco-report | Cobertura de testes |" >> $GITHUB_STEP_SUMMARY
-          echo "| spotbugs-report | Bugs estáticos |" >> $GITHUB_STEP_SUMMARY
-          echo "| surefire-reports | Testes unitários |" >> $GITHUB_STEP_SUMMARY
-
+          echo "| jacoco-report | Cobertura de testes (HTML) |" >> $GITHUB_STEP_SUMMARY
+          echo "| spotbugs-report | Bugs estáticos detectados |" >> $GITHUB_STEP_SUMMARY
+          echo "| surefire-reports | Resultado dos testes unitários |" >> $GITHUB_STEP_SUMMARY
 
   # ============================================================
   # Job 3: Segurança (OWASP + NVD)
+  # Roda em paralelo com build-and-test pra não atrasar feedback
   # ============================================================
   security-scan:
     name: Security Scan (OWASP)
     runs-on: ubuntu-latest
-    needs: lint                   # roda em paralelo com build-and-test
+    needs: lint
     timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Sem cache: maven aqui — o cache da NVD logo abaixo gerencia o subdiretório
+      # que precisamos. Misturar os dois cria conflito de restauração.
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
-          cache: maven
 
-      # Cache do banco de vulnerabilidades (evita download pesado ~500MB)
+      # Cache do banco de vulnerabilidades (evita download pesado ~500MB).
+      # Chave baseada no pom.xml — invalida só quando as dependências mudam.
       - name: Cache NVD database
         uses: actions/cache@v4
         with:
@@ -144,10 +144,13 @@ jobs:
             nvd-${{ runner.os }}-
 
       - name: Make mvnw executable
-        run: chmod +x ./mvnw
+        run: chmod +x ./productivity-api/mvnw
 
-      # Scan de vulnerabilidades usando NVD
+      # NVD_API_KEY é obrigatória desde 2023: sem ela, rate limit derruba o scan.
+      # Gere em https://nvd.nist.gov/developers/request-an-api-key e configure
+      # em Settings → Secrets and variables → Actions.
       - name: Run OWASP Dependency Check
+        working-directory: productivity-api
         run: ./mvnw -B org.owasp:dependency-check-maven:check -DnvdApiKey=${{ secrets.NVD_API_KEY }}
         continue-on-error: true
         # não quebra o build (modo observação)
@@ -158,5 +161,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: owasp-report
-          path: target/dependency-check-report.*
+          path: productivity-api/target/dependency-check-report.*
           retention-days: 7
