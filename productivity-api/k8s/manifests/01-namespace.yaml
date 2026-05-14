@@ -1,0 +1,9 @@
+# Namespace manifest for the productivity API application in the development environment.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: productivity-dev
+  labels:
+    app.kubernetes.io/part-of: productivity-api
+    environment: dev
