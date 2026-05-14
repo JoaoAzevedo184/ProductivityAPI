@@ -1,0 +1,29 @@
+# ============================================================
+# Kind cluster config — productivity-api
+#
+# 1 control-plane + portMappings prontos pra Ingress (Fase 4).
+# Sem worker nodes — pra dev local, o control-plane também roda pods.
+# ============================================================
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: productivity
+
+nodes:
+  - role: control-plane
+    # Labels para permitir scheduler do Ingress NGINX (Fase 4)
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+
+    # Mapeamento de portas Host -> Node
+    # Permite acessar Ingress na porta 80 do Windows quando configurarmos
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP
