@@ -1,0 +1,74 @@
+# ============================================================
+# docker-compose.yml — API (profile prod) + PostgreSQL
+#
+# Toda configuração vem do .env (ver .env.example).
+#
+# Uso:
+#   cp .env.example .env       # ajustar senhas
+#   docker compose up -d
+#   docker compose logs -f api
+#   docker compose down        # mantém volume
+#   docker compose down -v     # apaga volume também
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # PostgreSQL
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: productivity-postgres
+    environment:
+      POSTGRES_DB:       ${DB_NAME}
+      POSTGRES_USER:     ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # API só sobe quando o banco aceitar conexões
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - productivity-net
+    # Postgres NÃO expõe porta no host por padrão.
+    # Pra usar cliente externo (DBeaver, psql), descomente:
+    # ports:
+    #   - "${DB_PORT}:5432"
+
+  # ----------------------------------------------------------
+  # productivity-api
+  # ----------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: productivity-api:local
+    container_name: productivity-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL:      ${DB_URL}
+      DB_USER:     ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JAVA_OPTS:   ${JAVA_OPTS}
+    ports:
+      - "8080:8080"
+    networks:
+      - productivity-net
+
+# ----------------------------------------------------------
+# Volumes e Networks
+# ----------------------------------------------------------
+volumes:
+  pgdata:
+    name: productivity-pgdata
+
+networks:
+  productivity-net:
+    driver: bridge
