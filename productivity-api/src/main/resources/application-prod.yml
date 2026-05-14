@@ -3,15 +3,35 @@ spring:
     url: ${DB_URL}
     username: ${DB_USER}
     password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
 
   jpa:
+    # Flyway garante o schema. Hibernate confere se entidade casa com tabela.
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        # No Postgres real, deixar o dialeto ser auto-detectado
+        # (evita aviso de "H2Dialect specified explicitly" do dev)
+        format_sql: false
 
   h2:
     console:
       enabled: false
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  endpoint:
+    health:
+      show-details: never
+
 logging:
   level:
     root: WARN
+    com.github.joaovictor: INFO
+    # Em prod, querytrace cala
+    org.springframework.web: WARN
+    org.springdoc: WARN

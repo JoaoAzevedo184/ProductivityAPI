@@ -11,6 +11,13 @@ spring:
     ansi:
       enabled: ALWAYS
 
+  # Flyway: gerencia o schema de TODOS os ambientes (dev e prod).
+  # Convenção: V<N>__descricao.sql em src/main/resources/db/migration/
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true   # útil em bancos pré-existentes (ex: futuro K8s)
+
 logging:
   pattern:
     console: "%clr(%d{yyyy-MM-dd HH:mm:ss}){faint} %clr(%-5level){green} %clr(%logger{36}){cyan} - %msg%n"
@@ -19,3 +26,5 @@ logging:
     org.springdoc: DEBUG
     org.springframework.web: DEBUG
     com.github.joaovictor: DEBUG
+    # Flyway é falador no INFO; eleva pra WARN se incomodar
+    org.flywaydb: INFO
