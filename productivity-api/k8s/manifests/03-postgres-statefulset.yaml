@@ -1,0 +1,79 @@
+# ============================================================
+# Postgres como StatefulSet com PVC
+# ============================================================
+
+# Service "headless" (clusterIP: None) — necessário pra StatefulSet
+# Resolve DNS interno pra: postgres.productivity-dev.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: productivity-dev
+  labels:
+    app: postgres
+spec:
+  clusterIP: None        # headless: DNS aponta direto pro pod
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres
+  selector:
+    app: postgres
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: productivity-dev
+spec:
+  serviceName: postgres   # liga este StatefulSet ao Service acima
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres   # evita conflito com lost+found do PVC
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "productivity", "-d", "productivity"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "productivity", "-d", "productivity"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+  # volumeClaimTemplates: cria PVC automaticamente por replica
+  # No Kind, o storageClass default é "standard" (rancher.io/local-path)
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi
