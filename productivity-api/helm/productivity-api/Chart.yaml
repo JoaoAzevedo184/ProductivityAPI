@@ -1,0 +1,16 @@
+apiVersion: v2
+name: productivity-api
+description: API REST de gerenciamento de tarefas — Spring Boot 3.5 + Java 21
+type: application
+
+# Versão do CHART (este pacote Helm).
+# Sobe quando você mexe nos templates ou values.
+version: 0.1.0
+
+# Versão da APLICAÇÃO embarcada (a imagem Docker).
+# Sobe quando você publica uma nova versão da productivity-api.
+appVersion: "0.0.1"
+
+maintainers:
+  - name: João Victor Azevedo
+    url: https://github.com/JoaoAzevedo184

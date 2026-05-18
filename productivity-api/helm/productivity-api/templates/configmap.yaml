@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "productivity-api.fullname" . }}-config
+  labels:
+    {{- include "productivity-api.labels" . | nindent 4 }}
+data:
+  # Variáveis de ambiente NÃO sensíveis.
+  # Spring Boot lê do environment do container e popula a config.
+  SPRING_PROFILES_ACTIVE: {{ .Values.config.springProfilesActive | quote }}
+  # DB_URL é montado em runtime juntando host + port + dbname:
+  DB_URL: {{ printf "jdbc:postgresql://%s.%s.svc.cluster.local:%s/%s"
+    .Values.config.dbHost
+    .Release.Namespace
+    .Values.config.dbPort
+    .Values.config.dbName | quote }}
+  JAVA_OPTS: {{ .Values.config.javaOpts | quote }}

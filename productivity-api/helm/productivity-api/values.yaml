@@ -1,0 +1,45 @@
+# ============================================================
+# values.yaml — defaults da productivity-api
+#
+# Sobrescrevíveis via:
+#   helm install ... -f values-dev.yaml
+#   helm install ... --set replicaCount=3
+# ============================================================
+
+replicaCount: 1
+
+image:
+  repository: productivity-api
+  tag: local
+  # IfNotPresent: usa imagem local se existir, só baixa do registry se faltar.
+  # No Kind, vamos carregar a imagem manualmente, então essa policy é importante.
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP   # só dentro do cluster (sem acesso externo nesta fase)
+  port: 80          # porta do Service
+  targetPort: 8080  # porta do container (Spring Boot)
+
+# Configs NÃO-secretas (vão pro ConfigMap)
+# Conexão com o Postgres da Fase 1
+config:
+  springProfilesActive: prod
+  dbHost: postgres                          # nome do Service do Postgres
+  dbPort: "5432"
+  dbName: productivity
+  javaOpts: "-Xms256m -Xmx512m"
+
+# Credenciais sensíveis (referenciam Secret EXISTENTE — não criamos via Helm)
+# O Secret 'postgres-credentials' já foi criado na Fase 1.
+secrets:
+  existingSecret: postgres-credentials
+  userKey: POSTGRES_USER
+  passwordKey: POSTGRES_PASSWORD
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    cpu: 500m
+    memory: 768Mi

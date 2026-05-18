@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "productivity-api.fullname" . }}
+  labels:
+    {{- include "productivity-api.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+
+  selector:
+    matchLabels:
+      {{- include "productivity-api.selectorLabels" . | nindent 6 }}
+
+  template:
+    metadata:
+      labels:
+        {{- include "productivity-api.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Força rolling update quando o ConfigMap muda — sem isso,
+        # Deployment não percebe mudança em ConfigMap e os pods continuam
+        # com a config antiga até serem reiniciados manualmente.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.userKey }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.passwordKey }}
+
+          envFrom:
+            - configMapRef:
+                name: {{ include "productivity-api.fullname" . }}-config
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
