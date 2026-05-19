@@ -1,0 +1,57 @@
+# ============================================================
+# values-staging.yaml — overrides para ambiente de staging
+#
+# Filosofia: espelhar prod o máximo possível, mas com menos réplicas
+# e tolerância a "bugs novos" sendo testados. HPA ligado pra exercitar
+# o autoscaler antes de chegar em prod.
+#
+# Uso:
+#   helm install productivity ./helm/productivity-api \
+#     -f values.yaml \
+#     -f values-staging.yaml \
+#     --namespace productivity-staging
+# ============================================================
+
+replicaCount: 2          # ignorado quando HPA está habilitado, mas mantém clareza
+
+image:
+  tag: staging           # tag específica do pipeline; em prod vira sha-abc1234
+  pullPolicy: Always     # staging sempre busca a última imagem com a tag
+
+config:
+  springProfilesActive: prod    # usa Postgres como prod
+  javaOpts: "-Xms256m -Xmx512m"
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 384Mi
+  limits:
+    cpu: 1000m
+    memory: 768Mi
+
+probes:
+  startup:
+    enabled: true
+    failureThreshold: 30
+    periodSeconds: 5
+  liveness:
+    enabled: true
+  readiness:
+    enabled: true
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: staging.productivity.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []                # sem TLS em staging local (fica pra prod)

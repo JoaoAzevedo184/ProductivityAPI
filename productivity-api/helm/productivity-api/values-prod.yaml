@@ -1,0 +1,76 @@
+# ============================================================
+# values-prod.yaml — overrides para ambiente de produção
+#
+# Filosofia: zero surpresas. Réplicas mínimas suficientes pra sobreviver
+# à perda de 1 pod (PodDisruptionBudget em milestone futura), HPA agressivo,
+# pullPolicy travado em IfNotPresent (imagem é imutável, taggeada por SHA).
+#
+# Uso:
+#   helm install productivity ./helm/productivity-api \
+#     -f values.yaml \
+#     -f values-prod.yaml \
+#     --namespace productivity \
+#     --set image.tag=sha-abc1234     # injetado pelo pipeline
+# ============================================================
+
+replicaCount: 3          # ignorado quando HPA está habilitado
+
+image:
+  # tag NÃO é fixada aqui — vem do pipeline via --set image.tag=sha-<commit>.
+  # Manter 'latest' aqui seria um anti-padrão (não dá pra saber o que rodou).
+  tag: latest
+  # IfNotPresent é seguro porque cada deploy usa tag única (sha-xxx).
+  pullPolicy: IfNotPresent
+
+config:
+  springProfilesActive: prod
+  javaOpts: "-Xms512m -Xmx1024m"
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    cpu: 2000m
+    memory: 1Gi
+
+probes:
+  startup:
+    enabled: true
+    # Mais apertado em prod: se demora mais que 100s pra subir, algo está MUITO errado
+    failureThreshold: 20
+    periodSeconds: 5
+  liveness:
+    enabled: true
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 3         # nunca menos que 3 (alta disponibilidade)
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60   # mais conservador que staging — escala antes
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    # Em prod real, descomentar pra forçar HTTPS:
+    # nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+    {}
+  hosts:
+    - host: api.productivity.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: productivity-api-tls
+      hosts:
+        - api.productivity.example.com

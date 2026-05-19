@@ -1,0 +1,49 @@
+# ============================================================
+# values-dev.yaml — overrides para ambiente de desenvolvimento
+#
+# Filosofia: rodar barato no Kind/k3d, sem proteções de prod.
+# 1 pod, sem HPA, sem ingress, recursos baixos.
+#
+# Uso:
+#   helm install productivity ./helm/productivity-api \
+#     -f values.yaml \
+#     -f values-dev.yaml \
+#     --namespace productivity-dev
+# ============================================================
+
+replicaCount: 1
+
+image:
+  tag: local                # imagem buildada localmente, sem registry
+  pullPolicy: IfNotPresent
+
+config:
+  springProfilesActive: dev
+  # Em dev usa H2 in-memory — DB_URL do ConfigMap acaba ignorado pelo Spring,
+  # mas mantemos populado pra evitar erros de variável ausente.
+  javaOpts: "-Xms128m -Xmx256m"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Probes ficam mais relaxadas em dev — JIT mais lento, debugger podendo pausar
+probes:
+  startup:
+    enabled: true
+    failureThreshold: 40    # até 200s pra subir (DevTools + H2 + debugger podem demorar)
+    periodSeconds: 5
+  liveness:
+    enabled: true
+  readiness:
+    enabled: true
+
+autoscaling:
+  enabled: false
+
+ingress:
+  enabled: false
