@@ -43,3 +43,64 @@ resources:
   limits:
     cpu: 500m
     memory: 768Mi
+
+# ============================================================
+# Probes — todas apontam pro Actuator do Spring Boot
+#
+# Três probes, três responsabilidades:
+#   - startup:   "ainda tá subindo?" — protege liveness/readiness durante o boot
+#   - liveness:  "ainda tá vivo?" — se falhar, K8s MATA e reinicia o pod
+#   - readiness: "tá pronto pra tráfego?" — se falhar, K8s tira do Service (não mata)
+#
+# Por que startup importa: Spring Boot demora 15-30s pra subir. Sem startup probe,
+# a liveness probe acharia que o pod está morto e mataria ele antes da JVM terminar
+# o boot — clássico CrashLoopBackOff.
+# ============================================================
+probes:
+  startup:
+    enabled: true
+    path: /actuator/health
+    # failureThreshold × periodSeconds = tempo MÁXIMO de boot tolerado.
+    # 30 × 5s = 150s. Generoso o suficiente pra Postgres lento, JIT frio, etc.
+    failureThreshold: 30
+    periodSeconds: 5
+  liveness:
+    enabled: true
+    path: /actuator/health/liveness
+    initialDelaySeconds: 0    # startup já protege; pode começar imediato
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /actuator/health/readiness
+    initialDelaySeconds: 0
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# ============================================================
+# Ingress — desligado por padrão (ClusterIP basta pra dev)
+# Habilitado em values-prod.yaml
+# ============================================================
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: productivity.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ============================================================
+# HPA (Horizontal Pod Autoscaler) — desligado por padrão
+# Habilitado em values-staging.yaml e values-prod.yaml
+# ============================================================
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  # targetMemoryUtilizationPercentage: 80   # opcional, descomentar se quiser

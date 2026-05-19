@@ -5,7 +5,12 @@ metadata:
   labels:
     {{- include "productivity-api.labels" . | nindent 4 }}
 spec:
+  # Se HPA está habilitado, NÃO setar replicas no Deployment.
+  # Senão o HPA e o Deployment ficam brigando pelo número de pods
+  # (o Deployment "reverte" o que o HPA escala). Trecho condicional cuida disso.
+  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
 
   selector:
     matchLabels:
@@ -46,6 +51,47 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "productivity-api.fullname" . }}-config
+
+          # ====================================================
+          # Probes — ordem importa: startup roda PRIMEIRO,
+          # depois liveness e readiness começam a rodar em paralelo.
+          # ====================================================
+          {{- with .Values.probes.startup }}
+          {{- if .enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .path }}
+              port: http
+            failureThreshold: {{ .failureThreshold }}
+            periodSeconds: {{ .periodSeconds }}
+          {{- end }}
+          {{- end }}
+
+          {{- with .Values.probes.liveness }}
+          {{- if .enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ .path }}
+              port: http
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+            failureThreshold: {{ .failureThreshold }}
+          {{- end }}
+          {{- end }}
+
+          {{- with .Values.probes.readiness }}
+          {{- if .enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .path }}
+              port: http
+            initialDelaySeconds: {{ .initialDelaySeconds }}
+            periodSeconds: {{ .periodSeconds }}
+            timeoutSeconds: {{ .timeoutSeconds }}
+            failureThreshold: {{ .failureThreshold }}
+          {{- end }}
+          {{- end }}
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
