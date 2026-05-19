@@ -18,6 +18,27 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true   # útil em bancos pré-existentes (ex: futuro K8s)
 
+# ============================================================
+# Actuator: endpoints expostos + probes específicas pra K8s
+# ============================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        # liveness/readiness vêm via /actuator/health/{liveness,readiness}
+        # então NÃO precisa expor "liveness" e "readiness" como endpoints separados.
+        include: health, info, metrics
+  endpoint:
+    health:
+      # show-details: when-authorized é o default seguro;
+      # liveness/readiness funcionam mesmo com details desabilitados.
+      show-details: when-authorized
+      # Habilita explicitamente os "health groups" liveness e readiness.
+      # Em Spring Boot 3.5 isso vem ativo por default quando rodando em K8s,
+      # mas deixar explícito é mais robusto (funciona em qualquer ambiente).
+      probes:
+        enabled: true
+
 logging:
   pattern:
     console: "%clr(%d{yyyy-MM-dd HH:mm:ss}){faint} %clr(%-5level){green} %clr(%logger{36}){cyan} - %msg%n"
