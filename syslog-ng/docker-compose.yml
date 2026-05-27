@@ -1,0 +1,111 @@
+# ============================================================
+# docker-compose.yml — Stack de logging centralizado (Desafio 04)
+#
+# Sobe três serviços:
+#   - syslog-ng        -> coletor central de logs (porta 514)
+#   - postgres         -> banco, loga via syslog
+#   - productivity-api -> aplicacao, loga via syslog
+#
+# ABORDAGEM: logging POR SERVIÇO (nao global via daemon.json).
+#
+# DECISOES IMPORTANTES (Docker Desktop):
+#   - syslog-address usa udp://127.0.0.1:514 (NAO tcp://localhost):
+#       * localhost resolve pra ::1 (IPv6) -> timeout. 127.0.0.1 forca IPv4.
+#       * UDP nao exige conexao estabelecida -> nao trava o boot se o
+#         coletor ainda estiver subindo (TCP derrubaria o container).
+#   - sem healthcheck no syslog-ng: a imagem nao tem netstat/ss/nc e a
+#     porta UDP nao aparece em /proc/net/tcp. depends_on usa service_started.
+#
+# Uso (a partir desta pasta syslog-ng/):
+#   docker compose up -d
+#   docker compose logs -f syslog-ng
+#   docker compose down          # mantem logs no volume
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # Syslog-ng — coletor central
+  # ----------------------------------------------------------
+  syslog-ng:
+    image: lscr.io/linuxserver/syslog-ng:latest
+    container_name: syslog-ng
+    ports:
+      - "127.0.0.1:514:5514/tcp"
+      - "127.0.0.1:514:5514/udp"
+      - "127.0.0.1:601:6601/tcp"   # syslog estruturado (RFC 5425), uso futuro
+    volumes:
+      - ./config:/config
+      - syslog-data:/var/log/docker
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Recife
+    restart: unless-stopped
+    networks:
+      - logging-net
+
+  # ----------------------------------------------------------
+  # PostgreSQL — loga via syslog
+  # ----------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: productivity-postgres
+    depends_on:
+      syslog-ng:
+        condition: service_started
+    environment:
+      POSTGRES_DB: productivity
+      POSTGRES_USER: productivity
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - logging-net
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://127.0.0.1:514"
+        tag: "productivity-postgres"
+        syslog-format: "rfc5424"
+
+  # ----------------------------------------------------------
+  # productivity-api — loga via syslog
+  # ----------------------------------------------------------
+  api:
+    image: ghcr.io/joaoazevedo184/productivityapi:latest
+    container_name: productivity-api
+    depends_on:
+      syslog-ng:
+        condition: service_started
+      postgres:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/productivity
+      DB_USER: productivity
+      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+    ports:
+      - "8080:8080"
+    networks:
+      - logging-net
+    logging:
+      driver: syslog
+      options:
+        syslog-address: "udp://127.0.0.1:514"
+        tag: "productivity-api"
+        syslog-format: "rfc5424"
+
+# ----------------------------------------------------------
+# Volumes e Networks
+# ----------------------------------------------------------
+volumes:
+  syslog-data:
+    name: syslog-ng-logs
+  pgdata:
+    name: productivity-pgdata-logging
+
+networks:
+  logging-net:
+    driver: bridge
