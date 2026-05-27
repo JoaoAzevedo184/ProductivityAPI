@@ -6,27 +6,36 @@
 # e aplica no cluster Kind local via Helm — reproduzindo o que um
 # runner com acesso ao cluster faria automaticamente.
 #
-# Uso:
-#   ./deploy-local.sh <env> <image-tag>
+# Uso (rodar da RAIZ do repositorio):
+#   ./scripts/deploy-local.sh <env> <image-tag>
 #
 # Exemplos:
-#   ./deploy-local.sh dev sha-a1b2c3d
-#   ./deploy-local.sh staging sha-a1b2c3d
-#   ./deploy-local.sh prod sha-a1b2c3d
+#   ./scripts/deploy-local.sh dev sha-b0d47c7
+#   ./scripts/deploy-local.sh staging sha-b0d47c7
+#   ./scripts/deploy-local.sh prod sha-b0d47c7
 #
-# Pré-requisitos: docker, kind, kubectl, helm e o cluster Kind "productivity" criado.
+# Pre-requisitos: docker, kind, kubectl, helm e o cluster Kind "productivity" criado.
+#
+# NOTA: usa `docker save` + `kind load image-archive`. Imagens do pipeline
+# sao buildadas com provenance/sbom desabilitados (ver cd.yml), o que evita
+# o erro "content digest ... not found" do `kind load`.
 # ============================================================
 set -euo pipefail
 
 ENV="${1:-dev}"
 IMAGE_TAG="${2:-latest}"
 
-# Ajuste pro seu usuário/repo (minúsculas — exigência do GHCR)
+# Ajuste pro seu usuario/repo (minusculas — exigencia do GHCR)
 REGISTRY="ghcr.io"
-IMAGE_REPO="joaoazevedo184/productivity-api"
+IMAGE_REPO="joaoazevedo184/productivityapi"   # repo: ProductivityAPI -> productivityapi
 CLUSTER_NAME="productivity"
 
-# Mapeia env → namespace + values file
+# Caminho do chart relativo a RAIZ do repo.
+# A pasta raiz e o modulo Maven tem o mesmo nome (productivity-api),
+# por isso o chart fica em productivity-api/helm/productivity-api.
+HELM_CHART="./productivity-api/helm/productivity-api"
+
+# Mapeia env -> namespace + values file
 case "$ENV" in
   dev)
     NAMESPACE="productivity-dev"
@@ -41,34 +50,39 @@ case "$ENV" in
     VALUES_FILE="values-prod.yaml"
     ;;
   *)
-    echo "❌ Ambiente inválido: '$ENV'. Use: dev | staging | prod"
+    echo "Ambiente invalido: '$ENV'. Use: dev | staging | prod"
     exit 1
     ;;
 esac
 
 FULL_IMAGE="${REGISTRY}/${IMAGE_REPO}:${IMAGE_TAG}"
+TARFILE="$(mktemp -t prod-api-XXXXXX.tar)"
+
+cleanup() { rm -f "$TARFILE"; }
+trap cleanup EXIT
 
 echo "============================================================"
 echo "  Deploy local — productivity-api"
 echo "  Ambiente:  $ENV"
 echo "  Namespace: $NAMESPACE"
 echo "  Values:    $VALUES_FILE"
+echo "  Chart:     $HELM_CHART"
 echo "  Imagem:    $FULL_IMAGE"
 echo "============================================================"
 
-# 1. Puxa a imagem publicada pelo pipeline
-echo "→ [1/3] Puxando imagem do GHCR..."
+echo "-> [1/4] Puxando imagem do GHCR..."
 docker pull "$FULL_IMAGE"
 
-# 2. Carrega no Kind (sem isso → ImagePullBackOff dentro do cluster)
-echo "→ [2/3] Carregando imagem no cluster Kind..."
-kind load docker-image "$FULL_IMAGE" --name "$CLUSTER_NAME"
+echo "-> [2/4] Exportando imagem pra archive..."
+docker save "$FULL_IMAGE" -o "$TARFILE"
 
-# 3. Deploy via Helm
-echo "→ [3/3] Aplicando via Helm..."
-helm upgrade --install productivity ./helm/productivity-api \
-  -f helm/productivity-api/values.yaml \
-  -f "helm/productivity-api/${VALUES_FILE}" \
+echo "-> [3/4] Carregando archive no cluster Kind..."
+kind load image-archive "$TARFILE" --name "$CLUSTER_NAME"
+
+echo "-> [4/4] Aplicando via Helm..."
+helm upgrade --install productivity "$HELM_CHART" \
+  -f "${HELM_CHART}/values.yaml" \
+  -f "${HELM_CHART}/${VALUES_FILE}" \
   --set "image.repository=${REGISTRY}/${IMAGE_REPO}" \
   --set "image.tag=${IMAGE_TAG}" \
   --namespace "$NAMESPACE" \
@@ -76,5 +90,5 @@ helm upgrade --install productivity ./helm/productivity-api \
   --wait --timeout 5m
 
 echo ""
-echo "✅ Deploy concluído. Status dos pods:"
+echo "OK Deploy concluido. Status dos pods:"
 kubectl get pods -n "$NAMESPACE"
