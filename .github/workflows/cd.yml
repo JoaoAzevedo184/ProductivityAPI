@@ -1,2 +1,168 @@
+name: CD
+
+# ============================================================
+# Dispara só em merge na main (ou trigger manual).
+# O ci.yml já roda lint + test + security em todo push/PR,
+# então aqui o foco é EMPACOTAR e PUBLICAR a imagem.
+# ============================================================
 on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # permite rodar manualmente pela UI do GitHub
+
+# Evita dois deploys simultâneos da main pisando um no outro.
+# Diferente do CI, NÃO cancelamos em progresso — um deploy não deve
+# ser interrompido no meio.
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  # github.repository = "JoaoAzevedo184/productivity-api" → vira o nome da imagem.
+  # toLowerCase porque o GHCR exige nome de imagem em minúsculas.
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
+
+  # ============================================================
+  # Job 1: Build + Push da imagem Docker pro GHCR
+  # ============================================================
+  build-and-push:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      packages: write          # necessário pra publicar no GHCR
+
+    # Expõe a tag gerada pros jobs seguintes (deploy)
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Normaliza o nome da imagem pra minúsculas (GHCR exige).
+      # github.repository pode ter maiúsculas (JoaoAzevedo184).
+      - name: Lowercase image name
+        id: img
+        run: echo "name=${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}   # automático, não precisa criar
+
+      # Gera tags e labels automaticamente:
+      #   - sha-<7chars> (rastreabilidade por commit)
+      #   - latest (só na main)
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          # O Dockerfile está em productivity-api/, não na raiz
+          context: ./productivity-api
+          file: ./productivity-api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Cache via GitHub Actions — acelera builds subsequentes
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image summary
+        run: |
+          echo "## 🐳 Imagem publicada" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  # ============================================================
+  # Job 2: Deploy em STAGING (automático após push da imagem)
+  #
+  # NOTA HONESTA: o cluster Kind roda LOCALMENTE (no PC do dev).
+  # Um runner do GitHub na nuvem NÃO alcança o Kind local.
+  # Por isso, este job documenta o comando de deploy real que
+  # seria executado, mas não o aplica num cluster remoto.
+  #
+  # O deploy real é feito localmente (ver seção "Deploy local" no
+  # challenge-03.md), reproduzindo exatamente este comando.
+  # ============================================================
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: staging       # GitHub Environment (configurável em Settings)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy command (demonstrativo)
+        run: |
+          IMAGE_TAG="${{ needs.build-and-push.outputs.image-tag }}"
+          echo "## 🚀 Deploy em Staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Comando de deploy (executado localmente no cluster Kind):" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          echo "helm upgrade --install productivity ./helm/productivity-api \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  -f helm/productivity-api/values.yaml \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  -f helm/productivity-api/values-staging.yaml \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  --set image.tag=${IMAGE_TAG} \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  --namespace productivity-staging --create-namespace \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  --wait --timeout 5m" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "Deploy de staging documentado para a tag ${IMAGE_TAG}"
+
+  # ============================================================
+  # Job 3: Deploy em PRODUÇÃO (exige APROVAÇÃO MANUAL)
+  #
+  # O environment "production" deve ter "Required reviewers"
+  # configurado em Settings → Environments → production.
+  # Quando o pipeline chega aqui, PAUSA e aguarda alguém clicar
+  # "Approve and deploy" na aba Actions.
+  # ============================================================
+  deploy-production:
+    name: Deploy to Production
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production    # ⚠️ configurar required reviewers aqui
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy command (demonstrativo)
+        run: |
+          IMAGE_TAG="${{ needs.build-and-push.outputs.image-tag }}"
+          echo "## 🏭 Deploy em Produção (aprovado)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Comando de deploy (executado localmente no cluster Kind):" >> "$GITHUB_STEP_SUMMARY"
+          echo '```bash' >> "$GITHUB_STEP_SUMMARY"
+          echo "helm upgrade --install productivity ./helm/productivity-api \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  -f helm/productivity-api/values.yaml \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  -f helm/productivity-api/values-prod.yaml \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  --set image.tag=${IMAGE_TAG} \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  --namespace productivity --create-namespace \\" >> "$GITHUB_STEP_SUMMARY"
+          echo "  --wait --timeout 5m" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "Deploy de produção aprovado para a tag ${IMAGE_TAG}"
