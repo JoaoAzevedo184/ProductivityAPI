@@ -43,3 +43,9 @@ logs/
 .env.local
 *.env
 !.env.example
+
+# Runtime files do syslog-ng (gerados pelo container, não devem ir pro Git)
+syslog-ng/config/log/
+syslog-ng/config/syslog-ng.ctl
+syslog-ng/config/syslog-ng.persist
+syslog-ng/config/syslog-ng.pid
