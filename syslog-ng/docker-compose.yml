@@ -1,28 +1,39 @@
 # ============================================================
 # docker-compose.yml — Stack de logging centralizado (Desafio 04)
 #
-# Sobe três serviços:
-#   - syslog-ng        -> coletor central de logs (porta 514)
-#   - postgres         -> banco, loga via syslog
+# Sobe quatro servicos:
+#   - init-logs       -> ajusta permissoes do volume (roda uma vez e morre)
+#   - syslog-ng       -> coletor central de logs
+#   - postgres        -> banco, loga via syslog
 #   - productivity-api -> aplicacao, loga via syslog
 #
-# ABORDAGEM: logging POR SERVIÇO (nao global via daemon.json).
-#
-# DECISOES IMPORTANTES (Docker Desktop):
-#   - syslog-address usa udp://127.0.0.1:514 (NAO tcp://localhost):
-#       * localhost resolve pra ::1 (IPv6) -> timeout. 127.0.0.1 forca IPv4.
-#       * UDP nao exige conexao estabelecida -> nao trava o boot se o
-#         coletor ainda estiver subindo (TCP derrubaria o container).
-#   - sem healthcheck no syslog-ng: a imagem nao tem netstat/ss/nc e a
-#     porta UDP nao aparece em /proc/net/tcp. depends_on usa service_started.
-#
-# Uso (a partir desta pasta syslog-ng/):
-#   docker compose up -d
-#   docker compose logs -f syslog-ng
-#   docker compose down          # mantem logs no volume
+# DECISOES (Docker Desktop + linuxserver/syslog-ng):
+#   1. syslog-address: udp://127.0.0.1:514
+#      * localhost resolve pra ::1 (IPv6) -> usa 127.0.0.1 pra forcar IPv4
+#      * UDP nao trava o boot se o coletor ainda estiver subindo
+#   2. Portas mapeadas: externo 514 -> interno 5514
+#      * a imagem linuxserver/syslog-ng roda non-root, escuta em 5514
+#   3. Init container faz chown do volume (PUID=1000):
+#      * sem isso, syslog-ng (UID 1000) nao consegue escrever no /var/log/docker
+#        criado como root pelo Docker
+#   4. Sem healthcheck do syslog-ng:
+#      * a imagem nao tem netstat/ss/nc, e a porta UDP nao aparece em /proc/net/tcp
 # ============================================================
 
 services:
+
+  # ----------------------------------------------------------
+  # Init container — ajusta permissoes do volume e some.
+  # Sem isso, syslog-ng (UID 1000) nao consegue escrever
+  # no /var/log/docker que o Docker cria como root.
+  # ----------------------------------------------------------
+  init-logs:
+    image: alpine:3.20
+    container_name: syslog-ng-init
+    command: ["sh", "-c", "chown -R 1000:1000 /var/log/docker && echo 'permissoes ajustadas'"]
+    volumes:
+      - syslog-data:/var/log/docker
+    restart: "no"
 
   # ----------------------------------------------------------
   # Syslog-ng — coletor central
@@ -30,6 +41,9 @@ services:
   syslog-ng:
     image: lscr.io/linuxserver/syslog-ng:latest
     container_name: syslog-ng
+    depends_on:
+      init-logs:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:514:5514/tcp"
       - "127.0.0.1:514:5514/udp"
