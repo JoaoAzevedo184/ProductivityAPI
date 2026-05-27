@@ -1,479 +1,301 @@
 # 📜 Desafio 04 — Logging Centralizado com Syslog-ng
 
-> **Coletar logs de todos os contêineres** da productivity-api num único ponto, organizados por host e data, prontos para auditoria e análise.
+> **Coletar logs de todos os contêineres** num único ponto, organizados por container e data, prontos para auditoria e análise.
 
 | Campo | Valor |
 |---|---|
-| **Status** | 🔲 Planejado |
-| **Aplicação-base** | productivity-api (stack do [Desafio 02](challenge-02.md): API + Postgres) |
+| **Status** | ✅ **Concluído** (resta apenas slides) |
+| **Aplicação-base** | productivity-api (imagem do GHCR publicada pelo Desafio 01) |
 | **Ferramentas** | Syslog-ng + Docker Compose |
 | **Modo** | Solo |
 
 ---
 
-## 🎯 Objetivos
+## 🎯 Objetivos atingidos
 
-1. Implementar coletor centralizado de logs com Syslog-ng.
-2. Configurar o Docker para enviar logs de todos os containers via driver `syslog`.
-3. Organizar logs em hierarquia `host/ano/mês/dia.log`.
-4. Demonstrar consulta a logs de containers já encerrados.
-5. Documentar a arquitetura e ganhos para auditoria/observabilidade.
-
----
-
-## 🏗️ Arquitetura
-
-```
-┌─────────────────────┐    ┌────────────────────┐    ┌──────────────────────┐
-│  productivity-api   │    │                    │    │                      │
-│  productivity-postgres   │    │  Docker Daemon     │    │  Syslog-ng Server    │
-│  syslog-ng (self)   │───▶│  (log-driver:      │───▶│  Container           │
-│                     │    │   syslog)          │    │  porta 514 TCP/UDP   │
-└─────────────────────┘    └────────────────────┘    └──────────┬───────────┘
-                                                                │
-                                                                ▼
-                                                   ┌────────────────────────┐
-                                                   │  /var/log/docker/      │
-                                                   │  └── productivity-api/ │
-                                                   │      └── 2026/         │
-                                                   │          └── 05/       │
-                                                   │              ├── 10.log│
-                                                   │              └── 11.log│
-                                                   └────────────────────────┘
-```
+1. ✅ Coletor centralizado de logs com Syslog-ng.
+2. ✅ Cada container envia logs via driver `syslog`.
+3. ✅ Organização em hierarquia `<container>/<ano>/<mês>/<dia>.log`.
+4. ✅ Bucket separado para erros (`_errors/<data>.log`).
+5. ✅ Setup reprodutível (`docker compose down -v && up -d` funciona do zero).
+6. ✅ Logs sobrevivem aos containers que os geraram.
 
 ---
 
-## 🛠️ Implementação
+## 🏗️ Arquitetura final
 
-### Etapa 1 — Servidor Syslog-ng
-
-**`syslog-ng/docker-compose.yml`**
-
-```yaml
-services:
-  syslog-ng:
-    image: lscr.io/linuxserver/syslog-ng:latest
-    container_name: syslog-ng
-    ports:
-      - "514:514/tcp"
-      - "514:514/udp"
-      - "601:601/tcp"   # syslog estruturado (RFC 5425)
-    volumes:
-      - ./config:/config
-      - /var/log/docker:/var/log/docker
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/Recife
-    restart: unless-stopped
 ```
-
-**Decisões:**
-
-- `version` removido (deprecated no Compose v2).
-- `PUID`/`PGID=1000` para que os logs sejam graváveis pelo meu usuário no host (não-root).
-- `TZ=America/Recife` para que os timestamps fiquem no fuso correto.
-- 601/TCP exposto para evolução futura (transporte syslog estruturado / TLS).
-
----
-
-### Etapa 2 — Configuração do Syslog-ng
-
-**`syslog-ng/config/syslog-ng.conf`**
-
-```conf
-@version: 4.5
-@include "scl.conf"
-
-# ============================================================
-# Sources — onde os logs chegam
-# ============================================================
-source s_network {
-    # TCP é mais confiável (sem perda em rajadas)
-    network(
-        ip("0.0.0.0")
-        port(514)
-        transport("tcp")
-        flags(syslog-protocol)
-    );
-
-    # UDP mantido para clientes legados (não-Docker)
-    network(
-        ip("0.0.0.0")
-        port(514)
-        transport("udp")
-        flags(syslog-protocol)
-    );
-};
-
-# ============================================================
-# Template — como organizar os arquivos
-# ============================================================
-template t_logs {
-    template("/var/log/docker/${HOST}/${YEAR}/${MONTH}/${DAY}.log");
-    template_escape(no);
-};
-
-# ============================================================
-# Destinations — para onde escrever
-# ============================================================
-destination d_logs {
-    file(
-        template(t_logs)
-        create_dirs(yes)
-        dir-perm(0755)
-        perm(0644)
-    );
-};
-
-# Logs de erro num bucket separado (extra mile)
-filter f_errors { level(err..emerg); };
-
-destination d_errors {
-    file(
-        "/var/log/docker/_errors/${YEAR}-${MONTH}-${DAY}.log"
-        create_dirs(yes)
-    );
-};
-
-# ============================================================
-# Pipelines
-# ============================================================
-log {
-    source(s_network);
-    destination(d_logs);
-};
-
-log {
-    source(s_network);
-    filter(f_errors);
-    destination(d_errors);
-};
-```
-
-**Pontos importantes:**
-
-- `flags(syslog-protocol)` — interpreta corretamente RFC 5424 (formato que o Docker envia).
-- `${HOST}` — vem do `tag` configurado no Docker (que mapeio para o nome do container).
-- `create_dirs(yes)` — cria a hierarquia automaticamente, sem precisar de mkdir manual.
-- Permissões explícitas (`0755`/`0644`) seguem o princípio do menor privilégio.
-
----
-
-### Etapa 3 — Configuração do Docker
-
-**`/etc/docker/daemon.json`**
-
-```json
-{
-  "log-driver": "syslog",
-  "log-opts": {
-    "syslog-address": "tcp://localhost:514",
-    "tag": "{{.Name}}",
-    "syslog-format": "rfc5424",
-    "syslog-tls": "false"
-  }
-}
-```
-
-**Parâmetros:**
-
-| Parâmetro | Função |
-|---|---|
-| `log-driver` | Driver global de logs = syslog |
-| `syslog-address` | Onde mandar (Syslog-ng local na 514) |
-| `tag` | `{{.Name}}` = nome do container, vira `${HOST}` no Syslog-ng |
-| `syslog-format` | RFC 5424 traz timestamp preciso, severity e structured data |
-| `syslog-tls` | Desabilitado em local; obrigatório em prod |
-
-**Aplicar:**
-
-```bash
-sudo systemctl restart docker
-```
-
-> ⚠️ **Atenção:** isso derruba **todos** os containers em execução. Em produção: aplicar em janela de manutenção ou usar log driver por container (`docker run --log-driver=syslog ...`) em vez de global.
-
----
-
-### Etapa 4 — Aplicação envia logs estruturados
-
-Para tirar o máximo do Syslog-ng, a productivity-api deve emitir logs em JSON. Adicionar ao `logback-spring.xml`:
-
-```xml
-<dependency>
-    <groupId>net.logstash.logback</groupId>
-    <artifactId>logstash-logback-encoder</artifactId>
-    <version>7.4</version>
-</dependency>
-```
-
-```xml
-<!-- logback-spring.xml -->
-<configuration>
-    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
-
-    <springProfile name="prod">
-        <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
-        </appender>
-        <root level="INFO">
-            <appender-ref ref="JSON"/>
-        </root>
-    </springProfile>
-
-    <springProfile name="dev">
-        <!-- mantém o console pretty pra desenvolvimento -->
-        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder>
-                <pattern>%clr(%d{HH:mm:ss}){faint} %clr(%-5level) %logger{36} - %msg%n</pattern>
-            </encoder>
-        </appender>
-        <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
-        </root>
-    </springProfile>
-</configuration>
-```
-
-**Por quê:** em produção, logs em JSON permitem parsing por ferramentas (ELK, Loki) sem regex frágil. Em dev, formato humano é melhor.
-
----
-
-## 🧪 Testes de Validação
-
-### 1. Subir o Syslog-ng
-
-```bash
-cd syslog-ng
-docker compose up -d
-
-# Validar
-docker compose logs -f syslog-ng
-docker compose ps
-# syslog-ng   Up   0.0.0.0:514->514/tcp, 0.0.0.0:514->514/udp
-```
-
-### 2. Confirmar portas abertas
-
-```bash
-sudo ss -tulpn | grep 514
-# tcp   LISTEN   0  511  *:514   *:*
-# udp   UNCONN   0  0    *:514   *:*
-```
-
-### 3. Subir a productivity-api com o novo driver
-
-```bash
-cd ..
-docker compose up -d
-
-# Verificar que o driver de log é syslog
-docker inspect productivity-api | grep -A 5 "LogConfig"
-```
-
-### 4. Gerar tráfego
-
-```bash
-# Bater na API algumas vezes
-for i in {1..10}; do
-  curl -s http://localhost:8080/tasks > /dev/null
-done
-
-# Provocar um erro pra ver no _errors/
-curl http://localhost:8080/tasks/99999  # 404
-```
-
-### 5. Validar arquivos criados
-
-```bash
-tree /var/log/docker/
-# /var/log/docker/
-# ├── productivity-api/
-# │   └── 2026/
-# │       └── 05/
-# │           └── 10.log
-# ├── productivity-postgres/
-# │   └── 2026/
-# │       └── 05/
-# │           └── 10.log
-# └── _errors/
-#     └── 2026-05-10.log
-
-# Ver os logs em tempo real
-tail -f /var/log/docker/productivity-api/2026/05/10.log
-```
-
-### 6. Demonstrar resiliência
-
-```bash
-# Derrubar a API
-docker compose stop api
-
-# Os logs anteriores continuam disponíveis
-cat /var/log/docker/productivity-api/2026/05/10.log
-```
-
-Esse é o ponto crítico: **logs sobrevivem ao container**. Sem essa centralização, `docker logs` deixa de funcionar quando o container é removido.
-
----
-
-## ✅ Checklist de Validação
-
-- [ ] Syslog-ng inicia sem erros (`docker compose logs syslog-ng`)
-- [ ] Portas 514/TCP e 514/UDP escutando (`ss -tulpn | grep 514`)
-- [ ] `/etc/docker/daemon.json` aplicado e Docker reiniciado
-- [ ] Containers criam diretórios automaticamente
-- [ ] Estrutura `host/ano/mês/dia.log` respeitada
-- [ ] Erros vão para `_errors/`
-- [ ] Permissões corretas nos arquivos (`644`) e diretórios (`755`)
-- [ ] Logs sobrevivem a `docker compose down`
-
----
-
-## 🎤 Roteiro de Apresentação
-
-### Slide 1: Problema
-> "Quantas vezes você precisou debugar um container que já não existe mais?"
-
-- Sem centralização: `docker logs` morre com o container.
-- Com 10+ containers: difícil correlacionar eventos.
-
-### Slide 2: Solução
-- Diagrama da arquitetura.
-
-### Slide 3: Live demo
-1. Mostrar Syslog-ng rodando.
-2. Subir productivity-api + Postgres.
-3. Gerar tráfego.
-4. `tree /var/log/docker/` mostrando organização automática.
-5. `tail -f` mostrando logs em tempo real.
-6. `docker compose down` + mostrar que os logs continuam acessíveis.
-7. Mostrar pasta `_errors/` com erros filtrados.
-
-### Slide 4: Ganhos
-- Auditabilidade (logs sobrevivem).
-- Organização (por host/data).
-- Escalabilidade (recebe de múltiplos hosts).
-- Pronto pra evolução (ELK, Loki).
-
-### Slide 5: Próximos passos
-- Integrar com Prometheus + Grafana ([Desafio 05](challenge-05.md)).
-- TLS na 601 para ambientes externos.
-- Encaminhamento para Elasticsearch.
-
----
-
-## 🚧 Troubleshooting
-
-### Porta 514 ocupada pelo `rsyslog` do host
-
-```bash
-sudo systemctl status rsyslog
-sudo systemctl stop rsyslog
-sudo systemctl disable rsyslog
-```
-
-### Containers não enviam logs
-
-Verificar nesta ordem:
-
-```bash
-# 1. Daemon aplicou o config?
-sudo systemctl restart docker
-docker info | grep -i logging
-# Logging Driver: syslog
-
-# 2. Syslog-ng acessível?
-nc -vz localhost 514
-
-# 3. Firewall não bloqueia?
-sudo ufw status
-```
-
-### Logs aparecem ilegíveis
-
-Sintoma: caracteres estranhos ou linhas concatenadas.
-Causa: incompatibilidade RFC 3164 vs RFC 5424.
-Solução: garantir `syslog-format: rfc5424` no Docker **e** `flags(syslog-protocol)` no Syslog-ng.
-
-### Permissão negada nos diretórios
-
-```bash
-sudo chown -R 1000:1000 /var/log/docker
-sudo chmod -R 755 /var/log/docker
+   ┌─────────────────────┐    ┌────────────────────┐    ┌──────────────────────┐
+   │  productivity-api   │    │                    │    │                      │
+   │  productivity-      │    │  Docker driver     │    │  Syslog-ng           │
+   │  postgres           │───▶│  syslog (UDP)      │───▶│  Container           │
+   │                     │    │  udp://127.0.0.1:  │    │  porta interna 5514  │
+   │                     │    │  514               │    │                      │
+   └─────────────────────┘    └────────────────────┘    └──────────┬───────────┘
+                                                                   │
+                                                                   ▼
+                                                      ┌────────────────────────┐
+                                                      │  /var/log/docker/      │
+                                                      │  ├── productivity-api/ │
+                                                      │  │   └── 2026/05/      │
+                                                      │  │       └── 27.log    │
+                                                      │  ├── productivity-     │
+                                                      │  │   postgres/...      │
+                                                      │  └── _errors/          │
+                                                      │      └── 2026-05-27.log│
+                                                      └────────────────────────┘
 ```
 
 ---
 
-## 🔐 Considerações de Produção
-
-| Tópico | Recomendação |
-|---|---|
-| **TLS** | Habilitar na porta 6514 com certificados |
-| **Volume dedicado** | `/var/log/docker` num disco separado (não na partição raiz) |
-| **Rotação** | `logrotate` diário, comprimido, mantendo 30 dias |
-| **Monitoramento do coletor** | Métricas do próprio Syslog-ng (uso de CPU/memória/disco) |
-| **Alertas** | Disco > 80%, taxa de mensagens caindo abruptamente |
-| **Retenção** | Política clara: 30 dias online, 1 ano em cold storage (S3 Glacier) |
-
-### Exemplo de `logrotate`
-
-**`/etc/logrotate.d/docker-syslog`**
-
-```
-/var/log/docker/*/*/*/*.log {
-    daily
-    rotate 30
-    compress
-    delaycompress
-    missingok
-    notifempty
-    create 0644 root root
-}
-```
-
----
-
-## 📂 Estrutura Final
+## 📦 Estrutura entregue
 
 ```
 productivity-api/
-├── docker-compose.yml             # API + Postgres (Desafio 02)
-├── syslog-ng/
-│   ├── docker-compose.yml         # serviço syslog-ng
-│   └── config/
-│       └── syslog-ng.conf         # config das pipelines
-├── daemon.json.example            # template do /etc/docker/daemon.json
-└── (resto do projeto)
+└── syslog-ng/
+    ├── docker-compose.yml         # init-logs + syslog-ng + postgres + api
+    └── config/
+        └── syslog-ng.conf         # sources + destinations + pipelines
 ```
 
 ---
 
-## 📌 Status e Próximos Passos
+## ✅ O que foi implementado
 
-**Concluído:**
+### 1. `docker-compose.yml` com 4 serviços
 
-- [ ] Nada ainda.
+| Serviço | Função |
+|---|---|
+| **`init-logs`** | Container que faz `chown -R 1000:1000 /var/log/docker` e morre. Roda uma vez, garante permissão correta do volume. |
+| **`syslog-ng`** | Coletor central. Imagem `linuxserver/syslog-ng`, expõe porta 514 (mapeada pra 5514 interna). |
+| **`postgres`** | PostgreSQL 16. Loga via driver `syslog` apontando pro coletor. |
+| **`api`** | productivity-api (imagem do GHCR). Loga via driver `syslog`. |
 
-**A fazer:**
+### 2. Logging por serviço (não global)
 
-1. Criar `syslog-ng/docker-compose.yml` + config.
-2. Subir o Syslog-ng standalone, validar portas.
-3. Aplicar `daemon.json` e reiniciar Docker.
-4. Subir productivity-api e validar logs centralizados.
-5. Configurar logstash-logback-encoder na app para JSON em prod.
-6. Capturar logs/screenshots para a apresentação.
+Cada serviço declara seu próprio driver de log no compose:
+
+```yaml
+logging:
+  driver: syslog
+  options:
+    syslog-address: "udp://127.0.0.1:514"
+    tag: "productivity-api"
+    syslog-format: "rfc5424"
+```
+
+Por que **por serviço** em vez de global via `/etc/docker/daemon.json`:
+- No Docker Desktop, o daemon é configurado via GUI, não por arquivo.
+- Reiniciar o daemon afeta todos os containers do host (incluindo Kind dos Desafios 1-3).
+- Logging por serviço fica versionado no compose e isolado da stack.
+
+### 3. `syslog-ng.conf` com pipelines
+
+- **Sources** — TCP e UDP na porta interna **5514** (não 514 — explicado abaixo).
+- **Destination `d_logs`** — escreve em `/var/log/docker/${PROGRAM}/${YEAR}/${MONTH}/${DAY}.log`.
+- **Destination `d_errors`** — bucket separado para `level(err..emerg)`.
+- **Filter `f_errors`** — captura `err..emerg`.
+- **Dois pipelines** — todos os logs vão pro `d_logs`; erros TAMBÉM vão pro `d_errors`.
+
+---
+
+## 🧠 Decisões de arquitetura (e por quê)
+
+Estas decisões foram **descobertas durante o debug**. Cada uma resolve um problema real.
+
+### 1. Porta interna **5514**, não 514
+
+A imagem `linuxserver/syslog-ng` roda como usuário não-root (UID 1000). Portas < 1024 (como 514) são privilegiadas no Linux e não podem ser abertas por non-root. Por isso a imagem escuta internamente na **5514**. O compose faz o mapeamento `514:5514` pra preservar a porta padrão no host.
+
+### 2. `udp://127.0.0.1:514`, não `tcp://localhost:514`
+
+Dois problemas resolvidos com essa troca:
+
+- **`localhost` resolve pra `::1` (IPv6) primeiro.** O driver tentava conectar via IPv6, dava timeout, e o container morria com `dial tcp [::1]:514: connect: connection timed out`. `127.0.0.1` força IPv4.
+- **TCP exige conexão estabelecida.** Se o syslog-ng não está 100% pronto quando a API tenta logar, o container **morre**. UDP é fire-and-forget — o pacote sai mesmo que o destino ainda não esteja escutando. No primeiro segundo, perde-se algumas mensagens; no segundo seguinte, tudo flui.
+
+### 3. `${PROGRAM}`, não `${HOST}`, no template
+
+No formato **RFC 5424**, o campo `HOST` é o nome da máquina que enviou o log — sempre `docker-desktop`. O `tag` do compose chega como `APP-NAME`, que no syslog-ng é a variável `${PROGRAM}`.
+
+Sem essa correção, todos os logs iriam parar em `/var/log/docker/docker-desktop/...`, agrupados num arquivo só. Com `${PROGRAM}`, ficam separados por container (`productivity-api`, `productivity-postgres`).
+
+### 4. Init container para permissão
+
+O volume `/var/log/docker` é criado pelo Docker como `root:root`. Mas o syslog-ng roda como UID 1000 (por causa do `PUID=1000`). Resultado: `Error opening file for writing; error='Permission denied (13)'`.
+
+A solução: um container `alpine:3.20` minúsculo que sobe **antes** do syslog-ng, faz `chown -R 1000:1000 /var/log/docker`, e morre. O syslog-ng tem `depends_on: condition: service_completed_successfully`, então só sobe depois do init terminar.
+
+Vantagem dessa abordagem: **funciona em qualquer ambiente sem `chown` manual**, inclusive após `docker compose down -v`.
+
+### 5. Sintaxe `file("caminho-com-macros" opcoes...)`, não `template t_logs {...}`
+
+Versões antigas do syslog-ng aceitavam:
+
+```conf
+template t_logs { template("/var/log/docker/..."); };
+destination d_logs {
+    file( template(t_logs) create_dirs(yes) );    # ← sintaxe antiga
+};
+```
+
+Mas o syslog-ng 4.x rejeita isso com `unexpected KW_TEMPLATE`. A forma idiomática hoje é colocar o template direto na string do `file()`:
+
+```conf
+destination d_logs {
+    file("/var/log/docker/${PROGRAM}/${YEAR}/${MONTH}/${DAY}.log"
+        create_dirs(yes)
+    );
+};
+```
+
+Mais limpo, sem ponteiros indiretos.
+
+### 6. Sem healthcheck no syslog-ng
+
+A imagem `linuxserver/syslog-ng` não traz `netstat`, `ss` nem `nc`. E o syslog-ng escuta em UDP, que não aparece em `/proc/net/tcp`. Tentei três variações de healthcheck e todas falharam por falta de ferramenta ou porque UDP não cria estado de "listening" visível.
+
+Solução: remover o healthcheck e usar `depends_on: condition: service_started` nos outros serviços. Como o syslog-ng sobe em ~2s e UDP não exige conexão, qualquer mensagem perdida no primeiro segundo é tolerável.
+
+---
+
+## 🎬 Comandos e resultados (executados)
+
+### Setup do zero (reprodutível)
+
+```bash
+cd syslog-ng
+
+# Down completo
+docker compose down -v
+
+# Up — init-logs roda, depois syslog-ng, depois postgres + api
+docker compose up -d
+```
+
+Saída real:
+```
+✔ Container syslog-ng-init        Exited      1.6s
+✔ Container syslog-ng             Started     1.9s
+✔ Container productivity-postgres Started     2.0s
+✔ Container productivity-api      Started     2.1s
+```
+
+### Gerar tráfego e validar
+
+```bash
+# Tráfego normal + um erro 404
+curl -s http://localhost:8080/tasks > /dev/null
+curl -s http://localhost:8080/tasks/99999 > /dev/null
+sleep 5
+
+# Ver os arquivos criados
+docker compose exec syslog-ng sh -c "find /var/log/docker -type f"
+```
+
+Saída real:
+```
+/var/log/docker/productivity-api/2026/05/27.log
+/var/log/docker/productivity-postgres/2026/05/27.log
+/var/log/docker/_errors/2026-05-27.log
+```
+
+### Conteúdo dos logs (exemplo real)
+
+```bash
+docker compose exec syslog-ng sh -c "tail -5 /var/log/docker/productivity-api/2026/05/27.log"
+```
+
+```
+May 27 20:22:22 productivity-api[120]: 2026-05-27 20:22:22 INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+May 27 20:22:24 productivity-api[120]: 2026-05-27 20:22:24 WARN  o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default...
+May 27 20:22:25 productivity-api[120]: 2026-05-27 20:22:25 INFO  c.g.j.p.ProductivityApiApplication - Started ProductivityApiApplication in 8.507 seconds
+May 27 20:22:25 productivity-api[120]: 2026-05-27 20:22:25 WARN  o.s.c.events.SpringDocAppInitializer - SpringDoc /v3/api-docs endpoint is enabled by default...
+```
+
+### Demonstração de resiliência (logs sobrevivem ao container)
+
+```bash
+docker compose stop api
+
+# A API foi parada, mas os logs dela continuam acessíveis
+docker compose exec syslog-ng sh -c "tail -5 /var/log/docker/productivity-api/2026/05/27.log"
+# (mesmo output de antes)
+```
+
+**Mensagem-chave:** sem centralização, `docker logs productivity-api` morreria junto com o container. Com o Syslog-ng, os logs **sobrevivem**.
+
+---
+
+## ✅ Checklist de validação
+
+- [x] `docker compose up -d` sobe os 4 serviços sem erro
+- [x] `init-logs` ajusta permissão antes do syslog-ng iniciar
+- [x] Driver `syslog` confirmado nos containers da API e Postgres
+- [x] Pacotes RFC 5424 chegando na porta 5514 (confirmado via tcpdump)
+- [x] Hierarquia `<container>/<ano>/<mês>/<dia>.log` criada automaticamente
+- [x] Bucket `_errors/<data>.log` recebe erros (4xx do Spring)
+- [x] Logs sobrevivem a `docker compose stop`
+- [x] Setup reprodutível: `down -v && up -d` funciona do zero
+
+---
+
+## 🚧 Troubleshooting (lições aprendidas)
+
+### Pacotes chegam mas `/var/log/docker` vazio
+
+Causa mais provável: **permissão**. Veja o log interno:
+```bash
+docker compose exec syslog-ng sh -c "tail -20 /config/log/current"
+```
+Procurar por `Permission denied (13)`. Solução: o init container faz isso automaticamente. Se removeu por engano, rode manual:
+```bash
+docker compose exec syslog-ng chown -R 1000:1000 /var/log/docker
+```
+
+### Erro `unexpected KW_TEMPLATE` no log interno
+
+Causa: sintaxe antiga `template(t_logs)` dentro de `file()`. Solução: colocar o template direto na string do `file("caminho")`.
+
+### `Error opening file ... '/var/log/docker/docker-desktop/...'`
+
+Causa: usando `${HOST}` no template. `${HOST}` é o nome da máquina (`docker-desktop`), não do container. Use `${PROGRAM}`.
+
+### `dial tcp [::1]:514: connect: connection timed out` no container que loga
+
+Causa: `localhost` resolveu pra IPv6. Use `127.0.0.1` explícito.
+
+### Container morre no boot com "logging driver initialization failed"
+
+Causa: driver `tcp://` e syslog-ng ainda não pronto. Mude pra `udp://`.
+
+### Diagnosticar tráfego que chega na porta
+
+```bash
+docker compose exec syslog-ng sh -c "apk add --no-cache tcpdump"
+docker compose exec syslog-ng sh -c "tcpdump -i any -n 'udp port 5514' -A -c 5"
+```
+
+Em outro terminal, gere tráfego. Se pacotes aparecem no tcpdump mas nada é escrito, é problema da config do syslog-ng. Se nem pacotes aparecem, é problema do driver/rede.
+
+---
+
+## 📌 Próximos passos
+
+- [ ] Capturar screenshots da demo (find, tail, _errors/)
+- [ ] Atualizar slides (template em `apresentacao-prompts-e-roteiro.md`)
+- [ ] (opcional) Adicionar `logstash-logback-encoder` na productivity-api para logs JSON estruturados em prod
+- [ ] (opcional) Rotação automática com `logrotate` configurado no syslog-ng
+- [ ] (opcional) Encaminhar logs pra ELK / Loki (rumo ao Desafio 05)
 
 ---
 
 ## 📚 Referências
 
-- [Syslog-ng Documentation](https://www.syslog-ng.com/technical-documents/)
-- [Docker logging drivers](https://docs.docker.com/config/containers/logging/configure/)
+- [Syslog-ng — File destination](https://www.syslog-ng.com/technical-documents/doc/syslog-ng-open-source-edition/3.38/administration-guide/35#TOPIC-1829138)
+- [Docker — Configure logging drivers](https://docs.docker.com/config/containers/logging/configure/)
+- [Docker — Syslog logging driver](https://docs.docker.com/config/containers/logging/syslog/)
 - [RFC 5424 — Syslog Protocol](https://datatracker.ietf.org/doc/html/rfc5424)
 - [LinuxServer.io — syslog-ng image](https://docs.linuxserver.io/images/docker-syslog-ng)
-- [Logstash Logback Encoder](https://github.com/logfellow/logstash-logback-encoder)
 
-> 💡 **Lição transversal:** logs são a primeira fonte de verdade quando algo dá errado. Centralizar e organizar logs **antes** do incidente é o que diferencia "vamos descobrir o que aconteceu" de "perdemos os dados".
+> 💡 **Lição transversal:** logs são a primeira fonte de verdade quando algo dá errado. Centralizar e organizar logs **antes** do incidente é o que diferencia "vamos descobrir o que aconteceu" de "perdemos os dados". E a maior parte do trabalho não é arquitetura — é diagnosticar pequenos detalhes (porta interna, IPv6 vs IPv4, formato RFC, ownership de volume) que só aparecem quando a coisa toda tenta funcionar junto.
