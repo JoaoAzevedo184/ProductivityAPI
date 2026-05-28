@@ -9,6 +9,7 @@ import com.github.joaovictor.productivity_api.domain.enums.Priority;
 import com.github.joaovictor.productivity_api.domain.enums.TaskStatus;
 import com.github.joaovictor.productivity_api.exception.ResourceNotFoundException;
 import com.github.joaovictor.productivity_api.repository.TaskRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -20,9 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class TaskService {
   private final TaskRepository taskRepository;
+  private final MeterRegistry meterRegistry; // ← NOVO
 
-  public TaskService(TaskRepository taskRepository) {
+  public TaskService(TaskRepository taskRepository, MeterRegistry meterRegistry) { // ← NOVO param
     this.taskRepository = taskRepository;
+    this.meterRegistry = meterRegistry; // ← NOVO
   }
 
   // criar tarefa
@@ -30,6 +33,19 @@ public class TaskService {
   public TaskResponse create(CreateTaskRequest request) {
     Task task = TaskMapper.toEntity(request);
     Task savedTask = taskRepository.save(task);
+
+    // Métrica customizada: conta tarefas criadas, separadas por prioridade e status.
+    // No Prometheus vira: tasks_created_total{priority="HIGH",status="PENDING",...}
+    // Permite responder: "quantas tarefas HIGH são criadas por hora?"
+    meterRegistry
+        .counter(
+            "tasks_created",
+            "priority",
+            savedTask.getPriority().name(),
+            "status",
+            savedTask.getStatus().name())
+        .increment();
+
     return TaskMapper.toResponse(savedTask);
   }
 

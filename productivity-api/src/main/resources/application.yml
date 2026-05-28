@@ -25,19 +25,16 @@ management:
   endpoints:
     web:
       exposure:
-        # liveness/readiness vêm via /actuator/health/{liveness,readiness}
-        # então NÃO precisa expor "liveness" e "readiness" como endpoints separados.
-        include: health, info, metrics
+        include: health, info, metrics, prometheus    # ← adicione "prometheus"
   endpoint:
     health:
-      # show-details: when-authorized é o default seguro;
-      # liveness/readiness funcionam mesmo com details desabilitados.
       show-details: when-authorized
-      # Habilita explicitamente os "health groups" liveness e readiness.
-      # Em Spring Boot 3.5 isso vem ativo por default quando rodando em K8s,
-      # mas deixar explícito é mais robusto (funciona em qualquer ambiente).
       probes:
         enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}        # tag global em todas as métricas
+      env: ${SPRING_PROFILES_ACTIVE:dev}             # diferencia dev/staging/prod no Grafana
 
 logging:
   pattern:
