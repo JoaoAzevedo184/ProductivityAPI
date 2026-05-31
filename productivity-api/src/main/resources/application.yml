@@ -35,6 +35,9 @@ management:
     tags:
       application: ${spring.application.name}        # tag global em todas as métricas
       env: ${SPRING_PROFILES_ACTIVE:dev}             # diferencia dev/staging/prod no Grafana
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true   # Configurações específicas de métricas (ex: renomear, ignorar, etc.) podem ir aqui.
 
 logging:
   pattern:
