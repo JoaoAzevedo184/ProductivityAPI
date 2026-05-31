@@ -9,7 +9,10 @@ import com.github.joaovictor.productivity_api.domain.enums.Priority;
 import com.github.joaovictor.productivity_api.domain.enums.TaskStatus;
 import com.github.joaovictor.productivity_api.exception.ResourceNotFoundException;
 import com.github.joaovictor.productivity_api.repository.TaskRepository;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -20,12 +23,23 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 public class TaskService {
-  private final TaskRepository taskRepository;
-  private final MeterRegistry meterRegistry; // ← NOVO
 
-  public TaskService(TaskRepository taskRepository, MeterRegistry meterRegistry) { // ← NOVO param
+  private final TaskRepository taskRepository;
+  private final MeterRegistry meterRegistry;
+
+  // Timer é fixo (uma métrica só). Counters de criação são por prioridade,
+  // então resolvemos a tag em runtime via meterRegistry.counter(...) — o
+  // Micrometer faz cache do meter, não recria a cada chamada.
+  private final Timer taskCompletionTimer;
+
+  public TaskService(TaskRepository taskRepository, MeterRegistry meterRegistry) {
     this.taskRepository = taskRepository;
-    this.meterRegistry = meterRegistry; // ← NOVO
+    this.meterRegistry = meterRegistry;
+    this.taskCompletionTimer =
+        Timer.builder("tasks_completion_duration_seconds")
+            .description("Tempo decorrido entre a criação e a conclusão de uma tarefa")
+            .publishPercentileHistogram() // gera buckets => histogram_quantile() no Prometheus
+            .register(meterRegistry);
   }
 
   // criar tarefa
@@ -34,16 +48,11 @@ public class TaskService {
     Task task = TaskMapper.toEntity(request);
     Task savedTask = taskRepository.save(task);
 
-    // Métrica customizada: conta tarefas criadas, separadas por prioridade e status.
-    // No Prometheus vira: tasks_created_total{priority="HIGH",status="PENDING",...}
-    // Permite responder: "quantas tarefas HIGH são criadas por hora?"
-    meterRegistry
-        .counter(
-            "tasks_created",
-            "priority",
-            savedTask.getPriority().name(),
-            "status",
-            savedTask.getStatus().name())
+    // Métrica de negócio: total de tarefas criadas, rotulado por prioridade.
+    Counter.builder("tasks_created_total")
+        .description("Total de tarefas criadas")
+        .tag("priority", savedTask.getPriority().name())
+        .register(meterRegistry)
         .increment();
 
     return TaskMapper.toResponse(savedTask);
@@ -65,6 +74,12 @@ public class TaskService {
     if (request.status() != null && request.status() != statusAnterior) {
       if (request.status() == TaskStatus.COMPLETED) {
         task.setCompletedAt(LocalDateTime.now());
+
+        // Métrica de negócio: quanto tempo a tarefa levou da criação à conclusão.
+        // Só registramos na TRANSIÇÃO real para COMPLETED (não em re-saves).
+        if (task.getCreatedAt() != null) {
+          taskCompletionTimer.record(Duration.between(task.getCreatedAt(), task.getCompletedAt()));
+        }
       } else {
         task.setCompletedAt(null); // reabriu a tarefa → limpa
       }
