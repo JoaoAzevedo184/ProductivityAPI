@@ -16,6 +16,7 @@ import com.github.joaovictor.productivity_api.domain.enums.Priority;
 import com.github.joaovictor.productivity_api.domain.enums.TaskStatus;
 import com.github.joaovictor.productivity_api.exception.ResourceNotFoundException;
 import com.github.joaovictor.productivity_api.repository.TaskRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +26,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -45,12 +45,14 @@ class TaskServiceTest {
 
   @Mock private TaskRepository taskRepository;
 
-  @InjectMocks private TaskService taskService;
+  private TaskService taskService;
 
   private Task tarefaPersistida;
 
   @BeforeEach
   void setUp() {
+    taskService = new TaskService(taskRepository, new SimpleMeterRegistry());
+
     tarefaPersistida =
         Task.builder()
             .id(1L)
