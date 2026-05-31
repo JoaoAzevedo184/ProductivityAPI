@@ -47,3 +47,6 @@ autoscaling:
 
 ingress:
   enabled: false
+
+serviceMonitor:
+  enabled: true

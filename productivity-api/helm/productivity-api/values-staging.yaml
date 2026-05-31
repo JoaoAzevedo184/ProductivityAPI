@@ -55,3 +55,6 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []                # sem TLS em staging local (fica pra prod)
+
+serviceMonitor:
+  enabled: true

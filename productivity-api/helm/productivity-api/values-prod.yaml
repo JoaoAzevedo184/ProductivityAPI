@@ -74,3 +74,6 @@ ingress:
     - secretName: productivity-api-tls
       hosts:
         - api.productivity.example.com
+
+serviceMonitor:
+  enabled: true

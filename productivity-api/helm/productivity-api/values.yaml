@@ -104,3 +104,17 @@ autoscaling:
   maxReplicas: 3
   targetCPUUtilizationPercentage: 70
   # targetMemoryUtilizationPercentage: 80   # opcional, descomentar se quiser
+
+# ============================================================
+# ServiceMonitor — expõe a productivity-api ao Prometheus (Desafio 05)
+# Habilitado em values-dev.yaml, values-staging.yaml e values-prod.yaml
+# ============================================================
+serviceMonitor:
+  enabled: false
+  # releaseLabel: precisa casar com o serviceMonitorSelector do Prometheus.
+  # O kube-prometheus-stack instalado com release name "kube-prom-stack"
+  # procura ServiceMonitors com label "release: kube-prom-stack".
+  releaseLabel: kube-prom-stack
+  interval: 30s
+  scrapeTimeout: 10s
+  # namespace: ""   # vazio = mesmo namespace do release (recomendado)
