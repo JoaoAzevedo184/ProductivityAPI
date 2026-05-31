@@ -1,0 +1,44 @@
+{{- /*
+  =============================================================================
+  servicemonitor.yaml — expõe a productivity-api ao Prometheus (Desafio 05)
+  
+  O ServiceMonitor é um CRD do Prometheus Operator (vem com o
+  kube-prometheus-stack). Ele diz ao Prometheus: "encontre os Services que
+casam com este selector e faça scrape do endpoint /actuator/prometheus".
+
+  PRÉ-REQUISITO: o kube-prometheus-stack PRECISA estar instalado ANTES de
+  aplicar este chart com serviceMonitor.enabled=true. Sem o Operator, o CRD
+  'monitoring.coreos.com/v1' não existe e o helm install falha com
+  "no matches for kind ServiceMonitor".
+
+  LABEL CRÍTICA: 'release: kube-prom-stack'. Por padrão o kube-prometheus-stack
+  configura o Prometheus com serviceMonitorSelector procurando esta label.
+  Se ela não estiver aqui, o Prometheus IGNORA este ServiceMonitor em silêncio
+  (scrape nunca acontece, e não há erro — o pior tipo de bug de observabilidade).
+  =============================================================================
+  */ -}}
+  {{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "productivity-api.fullname" . }}
+  {{- if .Values.serviceMonitor.namespace }}
+  namespace: {{ .Values.serviceMonitor.namespace }}
+  {{- end }}
+  labels:
+    {{- include "productivity-api.labels" . | nindent 4 }}
+    release: {{ .Values.serviceMonitor.releaseLabel | default "kube-prom-stack" }}
+spec:
+  # Procura Services com as MESMAS selectorLabels do Deployment/Service do chart.
+  selector:
+    matchLabels:
+      {{- include "productivity-api.selectorLabels" . | nindent 6 }}
+  # namespaceSelector: por padrão o Operator só olha o namespace do
+  # ServiceMonitor. Como o ServiceMonitor e o Service ficam no mesmo
+  # namespace (o do release), não precisamos declarar nada aqui.
+  endpoints:
+    - port: http                       # nome da porta no Service (não o número)
+      path: /actuator/prometheus
+      interval: {{ .Values.serviceMonitor.interval | default "30s" }}
+      scrapeTimeout: {{ .Values.serviceMonitor.scrapeTimeout | default "10s" }}
+  {{- end }}
