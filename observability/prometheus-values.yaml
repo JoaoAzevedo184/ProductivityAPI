@@ -1,0 +1,139 @@
+# =============================================================================
+# prometheus-values.yaml — kube-prometheus-stack ENXUTO para Kind local
+#
+# Hardware-alvo: Kind single-node num PC modesto (i3, RAM compartilhada com
+# a productivity-api + Postgres). O default do chart é pensado pra cloud e
+# sobe componentes pesados que NÃO agregam ao Desafio 05 num cluster local.
+#
+# O que desligamos e POR QUÊ:
+#   - Componentes de controle do cluster gerenciado (etcd, kube-scheduler,
+#     kube-controller-manager, kube-proxy, kubelet): no Kind esses scrapes
+#     ou falham ou geram ruído; o desafio é sobre observar a APP, não o Kind.
+#   - Retention curta (3d) e volume pequeno: você não precisa de 15 dias de
+#     métricas pra uma demo de 10 minutos.
+#   - Recursos apertados: requests baixos pra caber junto da app.
+#
+# Instalação:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm repo update
+#   helm install kube-prom-stack prometheus-community/kube-prometheus-stack \
+#     --namespace observability --create-namespace \
+#     -f observability/prometheus-values.yaml
+# =============================================================================
+
+# ----- Prometheus -----------------------------------------------------------
+prometheus:
+  prometheusSpec:
+    # CRÍTICO: faz o Prometheus enxergar ServiceMonitors de QUALQUER namespace,
+    # não só os criados pelo próprio chart. Sem isto, o ServiceMonitor da app
+    # (no namespace productivity-dev) seria ignorado.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector: {}
+    ruleNamespaceSelector: {}
+
+    retention: 3d
+    retentionSize: 1GB
+
+    resources:
+      requests:
+        cpu: 150m
+        memory: 400Mi
+      limits:
+        cpu: "1"
+        memory: 900Mi
+
+    # storageSpec: comentado de propósito. Sem PVC, o Prometheus usa emptyDir
+    # (perde dados ao reiniciar o pod). Pra uma demo isso é ACEITÁVEL e evita
+    # depender do provisionador de storage do Kind. Se quiser persistir,
+    # descomente abaixo (o Kind tem storageClass "standard"):
+    #
+    # storageSpec:
+    #   volumeClaimTemplate:
+    #     spec:
+    #       accessModes: ["ReadWriteOnce"]
+    #       resources:
+    #         requests:
+    #           storage: 2Gi
+
+# ----- Grafana --------------------------------------------------------------
+grafana:
+  adminPassword: admin    # demo local; em prod viria de Secret/sealed-secret
+  defaultDashboardsEnabled: true   # já traz dashboards de JVM/K8s úteis
+  service:
+    type: NodePort
+    nodePort: 30000       # acessível via http://localhost:30000 se o Kind
+    # mapear a porta; senão use port-forward (ver script)
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  # Provisiona automaticamente os dashboards customizados a partir de
+  # ConfigMaps que tenham a label grafana_dashboard=1 (ver script de import).
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+
+# ----- Alertmanager ---------------------------------------------------------
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  # Em demo local não configuramos receiver real (Slack/email). O alerta
+  # disparado fica visível na própria UI do Alertmanager / Prometheus.
+
+# ----- Componentes pesados/desnecessários no Kind: DESLIGADOS ---------------
+# node-exporter e kube-state-metrics ficam LIGADOS (são baratos e úteis para
+# as métricas USE de CPU/memória). O resto, que no Kind só dá ruído, desliga:
+kubeApiServer:
+  enabled: true            # barato e útil
+kubelet:
+  enabled: true            # fonte das métricas de container/pod
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Reduz recursos do Operator também
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi

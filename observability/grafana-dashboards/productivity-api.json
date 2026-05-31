@@ -1,0 +1,189 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "title": "Productivity API — RED + Negócio",
+  "uid": "productivity-api",
+  "tags": ["productivity-api", "desafio-05"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "time": { "from": "now-30m", "to": "now" },
+  "refresh": "10s",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "RED — Rate / Errors / Duration",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Rate — requisições por segundo (por URI)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"productivity-api\"}[1m])) by (uri, method)",
+          "legendFormat": "{{method}} {{uri}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Errors — % de 5xx (5m)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(http_server_requests_seconds_count{application=\"productivity-api\",status=~\"5..\"}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_requests_seconds_count{application=\"productivity-api\"}[5m])), 0.0001)",
+          "legendFormat": "erro 5xx"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Duration — latência HTTP média (por URI)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_sum{application=\"productivity-api\"}[5m])) by (uri) / clamp_min(sum(rate(http_server_requests_seconds_count{application=\"productivity-api\"}[5m])) by (uri), 0.0001)",
+          "legendFormat": "{{uri}}"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_sum{application=\"productivity-api\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{application=\"productivity-api\"}[5m])), 0.0001)",
+          "legendFormat": "média geral"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "USE — Recursos (JVM / CPU / Pool)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+    {
+      "type": "timeseries",
+      "title": "JVM heap usado (%)",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1 } },
+      "targets": [
+        {
+          "expr": "sum(jvm_memory_used_bytes{application=\"productivity-api\",area=\"heap\"}) / sum(jvm_memory_max_bytes{application=\"productivity-api\",area=\"heap\"})",
+          "legendFormat": "heap"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU do processo",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 10 },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [
+        {
+          "expr": "avg(process_cpu_usage{application=\"productivity-api\"})",
+          "legendFormat": "process cpu"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HikariCP — conexões ativas vs máx",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 10 },
+      "targets": [
+        {
+          "expr": "hikaricp_connections_active{application=\"productivity-api\"}",
+          "legendFormat": "ativas"
+        },
+        {
+          "expr": "hikaricp_connections_max{application=\"productivity-api\"}",
+          "legendFormat": "máx"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Negócio",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tarefas criadas — total acumulado por prioridade",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
+      "targets": [
+        {
+          "expr": "sum(tasks_total{application=\"productivity-api\"}) by (priority)",
+          "legendFormat": "{{priority}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total de tarefas criadas",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 19 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(tasks_total{application=\"productivity-api\"})",
+          "legendFormat": "total",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Tempo de conclusão de tarefa — p50/p90/p99",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 19 },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(tasks_completion_duration_seconds_bucket{application=\"productivity-api\"}[1h])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.90, sum(rate(tasks_completion_duration_seconds_bucket{application=\"productivity-api\"}[1h])) by (le))",
+          "legendFormat": "p90"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(tasks_completion_duration_seconds_bucket{application=\"productivity-api\"}[1h])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    }
+  ]
+}

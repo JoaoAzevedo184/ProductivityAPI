@@ -1,0 +1,92 @@
+# =============================================================================
+# prometheus-rules.yaml — alertas da productivity-api (Desafio 05)
+#
+# PrometheusRule é um CRD do Operator. O Prometheus carrega as regras que
+# tenham label "release: kube-prom-stack" (mesma lógica do ServiceMonitor).
+#
+# Aplicar:
+#   kubectl apply -f observability/prometheus-rules.yaml
+#
+# NOTA de namespace: a app roda em "productivity-dev" (ver k8s/manifests/).
+# Os alertas que filtram por namespace usam productivity-dev. Se você fizer
+# a demo em prod (namespace "productivity"), ajuste os filtros.
+#
+# Princípio: alertas baseados em SLO, não em números mágicos. "1% de erro 5xx"
+# deriva de um SLO de 99% de disponibilidade.
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: productivity-api-alerts
+  namespace: observability
+  labels:
+    release: kube-prom-stack
+spec:
+  groups:
+    - name: productivity-api.rules
+      interval: 30s
+      rules:
+        # --- Disponibilidade: taxa de erro 5xx acima do orçamento de erro ---
+        - alert: HighErrorRate
+          expr: |
+            sum(rate(http_server_requests_seconds_count{application="productivity-api",status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count{application="productivity-api"}[5m]))
+            > 0.01
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Taxa de erro 5xx alta na productivity-api"
+            description: "Mais de 1% das requisições retornaram 5xx nos últimos 5 minutos (SLO de 99% violado)."
+
+        # --- Latência: média acima de 500ms ---
+        # Usa _sum/_count (sempre presentes). Percentis exigiriam
+        # percentiles-histogram habilitado p/ http.server.requests.
+        - alert: HighLatencyAvg
+          expr: |
+            sum(rate(http_server_requests_seconds_sum{application="productivity-api"}[5m]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{application="productivity-api"}[5m])), 0.0001)
+            > 0.5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Latência média acima de 500ms na productivity-api"
+            description: "A latência HTTP média está acima de 500ms há 10 minutos."
+
+        # --- Resiliência: pod reiniciando em loop ---
+        - alert: PodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="productivity-dev"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Pod {{ $labels.pod }} reiniciando em loop"
+            description: "O container {{ $labels.container }} no pod {{ $labels.pod }} está reiniciando repetidamente."
+
+        # --- Saturação de recurso: pool de conexões do banco quase cheio ---
+        - alert: HikariPoolNearExhaustion
+          expr: |
+            hikaricp_connections_active{application="productivity-api"}
+            /
+            hikaricp_connections_max{application="productivity-api"}
+            > 0.9
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pool de conexões HikariCP quase esgotado (>90%)"
+            description: "Mais de 90% das conexões do pool estão ativas. Risco de timeouts de conexão ao banco."
+
+        # --- Disponibilidade dura: alvo de scrape caiu ---
+        - alert: ProductivityApiDown
+          expr: up{job=~".*productivity-api.*"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "productivity-api fora do ar (scrape falhando)"
+            description: "O Prometheus não consegue coletar métricas da productivity-api há 2 minutos."
