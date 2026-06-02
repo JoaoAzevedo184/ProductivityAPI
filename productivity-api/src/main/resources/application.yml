@@ -32,7 +32,7 @@ management:
       probes:
         enabled: true
   metrics:
-    tags:
+    tags: #
       application: ${spring.application.name}        # tag global em todas as métricas
       env: ${SPRING_PROFILES_ACTIVE:dev}             # diferencia dev/staging/prod no Grafana
     distribution:
