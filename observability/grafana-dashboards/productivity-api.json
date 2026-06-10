@@ -139,7 +139,7 @@
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 19 },
       "targets": [
         {
-          "expr": "sum(tasks_total{application=\"productivity-api\"}) by (priority)",
+          "expr": "sum(tasks_created_total{application=\"productivity-api\"}) by (priority)",
           "legendFormat": "{{priority}}"
         }
       ]
@@ -158,7 +158,7 @@
       },
       "targets": [
         {
-          "expr": "sum(tasks_total{application=\"productivity-api\"})",
+          "expr": "sum(tasks_created_total{application=\"productivity-api\"})",
           "legendFormat": "total",
           "instant": true
         }

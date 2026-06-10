@@ -4,7 +4,7 @@
 
 | Campo | Valor |
 |---|---|
-| **Status** | 🔲 Planejado |
+| **Status** | ✅ Planejado |
 | **Aplicação-base** | productivity-api (Spring Boot 3.5 + Java 21) |
 | **Entrega** | 04 / Março / 2026 |
 | **Modo** | Solo |
@@ -43,10 +43,10 @@ Como vou fazer sozinho, cada "papel" do enunciado vira uma etapa do meu próprio
 
 Antes do pipeline, garantir que a app tem o mínimo:
 
-- [ ] Suite de testes funcional (`./mvnw test` passa)
-- [ ] Endpoint de health: `/actuator/health` (adicionar `spring-boot-starter-actuator`)
-- [ ] Cobertura mínima alvo: **80%** (configurar JaCoCo no `pom.xml`)
-- [ ] Linter: usar **Spotless** ou **Checkstyle** com config minimalista
+- [x] Suite de testes funcional (`./mvnw test` passa)
+- [x] Endpoint de health: `/actuator/health` (adicionar `spring-boot-starter-actuator`)
+- [x] Cobertura mínima alvo: **80%** (configurar JaCoCo no `pom.xml`)
+- [x] Linter: usar **Spotless** ou **Checkstyle** com config minimalista
 
 **Tarefas:**
 
@@ -287,7 +287,7 @@ Configurar em **Settings → Secrets and variables → Actions**:
 
 **Concluído:**
 
-- [ ] Nada ainda — está na fila.
+- [x] Nada ainda — está na fila.
 
 **A fazer (ordem):**
 

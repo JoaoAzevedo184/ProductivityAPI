@@ -45,9 +45,8 @@ services:
       init-logs:
         condition: service_completed_successfully
     ports:
-      - "127.0.0.1:514:5514/tcp"
-      - "127.0.0.1:514:5514/udp"
-      - "127.0.0.1:601:6601/tcp"   # syslog estruturado (RFC 5425), uso futuro
+      - "127.0.0.1:1514:5514/tcp"
+      - "127.0.0.1:1514:5514/udp"
     volumes:
       - ./config:/config
       - syslog-data:/var/log/docker
@@ -79,7 +78,7 @@ services:
     logging:
       driver: syslog
       options:
-        syslog-address: "udp://127.0.0.1:514"
+        syslog-address: "udp://127.0.0.1:1514"
         tag: "productivity-postgres"
         syslog-format: "rfc5424"
 
@@ -107,7 +106,7 @@ services:
     logging:
       driver: syslog
       options:
-        syslog-address: "udp://127.0.0.1:514"
+        syslog-address: "udp://127.0.0.1:1514"
         tag: "productivity-api"
         syslog-format: "rfc5424"
 
