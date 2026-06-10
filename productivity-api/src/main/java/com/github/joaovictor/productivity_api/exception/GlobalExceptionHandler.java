@@ -56,14 +56,17 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   public ResponseEntity<ApiError> handleTypeMismatch(
       MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+
+    Class<?> requiredType = ex.getRequiredType();
+    String aceitos =
+        (requiredType != null && requiredType.isEnum())
+            ? Arrays.toString(requiredType.getEnumConstants())
+            : String.valueOf(requiredType);
+
     String message =
         String.format(
             "Parâmetro '%s' com valor inválido: '%s'. Valores aceitos: %s",
-            ex.getName(),
-            ex.getValue(),
-            ex.getRequiredType() != null && ex.getRequiredType().isEnum()
-                ? Arrays.toString(ex.getRequiredType().getEnumConstants())
-                : ex.getRequiredType());
+            ex.getName(), ex.getValue(), aceitos);
 
     ApiError error =
         new ApiError(
